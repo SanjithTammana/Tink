@@ -1,10 +1,16 @@
-# Python 3.11 (envisionhgdetector pins tensorflow-cpu 2.15.1 and mediapipe 0.10.7; neither installs on 3.12+).
-# Install: python -m pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
-# Windows: import torch before tensorflow, or c10.dll fails to load (WinError 1114). Every entry module does.
-envisionhgdetector==3.0.8
+# Python 3.11 on Windows (x64) and macOS (Apple Silicon or Intel). Two steps; setup_mac.sh / setup_windows.ps1 run them.
+#   python -m pip install -r requirements.txt
+#   python -m pip install --no-deps envisionhgdetector==3.0.8
+# envisionhgdetector goes in with --no-deps: its declared deps pin tensorflow-cpu, which has no macOS build, and
+# Tink only uses its LightGBM model (video.py loads that module without the TensorFlow parts).
+# macOS also needs the OpenMP runtime for LightGBM: brew install libomp
 mediapipe==0.10.7
-tensorflow-cpu==2.15.1
-torch==2.14.1+cpu
+opencv-python==4.11.0.86
+numpy==1.26.4
+lightgbm==4.7.0
+scikit-learn==1.7.2
+joblib==1.6.0
+torch==2.14.1
 transformers==5.20.2
 sentence-transformers==6.2.0
 faster-whisper==1.2.1
@@ -13,9 +19,3 @@ soundfile==0.14.0
 sounddevice==0.5.6
 ultralytics==8.4.188
 pyttsx3==2.99
-scikit-learn==1.9.1
-joblib==1.6.0
-numpy==1.26.4
-pandas==1.5.3
-protobuf==3.20.3
-opencv-python==4.11.0.86

@@ -18,7 +18,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-import torch  # keep before anything that imports tensorflow (c10.dll load error on this machine)
+import torch
 import numpy as np
 
 from transcribe import Transcriber

@@ -15,7 +15,6 @@ import re
 import time
 from pathlib import Path
 
-import torch  # keep before anything that imports tensorflow (c10.dll load error on this machine)
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent

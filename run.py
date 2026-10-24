@@ -11,7 +11,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-import torch  # must load before tensorflow (envisionhgdetector) on this machine: c10.dll WinError 1114
 import cv2
 import numpy as np
 

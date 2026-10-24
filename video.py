@@ -3,10 +3,13 @@ and EnvisionHGdetector's LightGBM Gesture/NoGesture score.
 
 Self-test: python video.py --video sample.mp4 [--frames N] [--no-yolo] [--no-envision]
 """
-import torch  # must come before anything imports tensorflow (envisionhgdetector), else c10.dll fails on Windows
 import argparse
 import contextlib
+import importlib
+import importlib.util
 import io
+import sys
+import types
 import math
 import time
 import urllib.request
@@ -46,11 +49,30 @@ def download_once(url, path):
     return str(path)
 
 
+def envision_lightgbm_class():
+    """envisionhgdetector's real-time LightGBM model, loaded without the package __init__.
+
+    The __init__ imports the TensorFlow CNN too, and its pinned tensorflow-cpu has no macOS build. The LightGBM
+    path only needs config.py and model_lightgbm.py (OpenCV, MediaPipe, NumPy, joblib), so a bare package
+    stub lets just those two modules run. Install the package with pip --no-deps.
+    """
+    if 'envisionhgdetector' not in sys.modules:
+        spec = importlib.util.find_spec('envisionhgdetector')
+        if spec is None:
+            raise ImportError('envisionhgdetector is not installed (pip install --no-deps envisionhgdetector==3.0.8)')
+        pkg = types.ModuleType('envisionhgdetector')
+        pkg.__path__ = list(spec.submodule_search_locations)
+        pkg.__spec__ = spec
+        pkg.__file__ = spec.origin
+        sys.modules['envisionhgdetector'] = pkg
+    return importlib.import_module('envisionhgdetector.model_lightgbm').LightGBMGestureModel
+
+
 class EnvisionGesture:
     # Package assumptions: BGR frames in (it converts to RGB itself), one person, front view,
     # 5-frame world-landmark window, trained on 25-30 fps video (velocity features are per frame).
     def __init__(self, smooth_frames=5):
-        from envisionhgdetector import LightGBMGestureModel
+        LightGBMGestureModel = envision_lightgbm_class()
         with contextlib.redirect_stdout(io.StringIO()):  # its load message has a unicode check mark that breaks cp1252 stdout
             self.model = LightGBMGestureModel()
         if self.model.model is None:

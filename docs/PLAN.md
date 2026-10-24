@@ -15,8 +15,9 @@ tink/
 ├── data/vocalizations/       # <label>/*.wav folders and/or manifest CSVs (path,label); any number of datasets
 └── models/                   # downloaded .task files, trained vocalization classifier (git-ignored)
 ```
-Environment: Python 3.11 `.venv` (envisionhgdetector pins tensorflow-cpu 2.15.1, mediapipe 0.10.7, pandas<2,
-numpy<2; none install on 3.12). `constraints.txt` holds those pins; always `pip install -c constraints.txt`.
+Environment: Python 3.11 `.venv` on Windows or macOS. Use `setup_windows.ps1` / `setup_mac.sh`: they install
+`requirements.txt`, then envisionhgdetector with `--no-deps`. Its declared deps pin tensorflow-cpu, which has no
+macOS build, and Tink only uses its LightGBM model, loaded without the TensorFlow parts.
 
 ## What the papers change in the method
 **voc2vec (Koudounas et al., ICASSP 2025).**
