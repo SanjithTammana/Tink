@@ -79,24 +79,25 @@ numpy<2; none install on 3.12). `constraints.txt` holds those pins; always `pip 
 ## Target pipeline (Sanjith's diagram, 2026-10-24) and build status
 | Stage | Module | Status |
 |---|---|---|
-| Video → Envision (Holistic → kinematic features → LightGBM → gesture detection) → visual evidence | `video.py` | subagent building |
+| Video → Envision (Holistic → kinematic features → LightGBM → gesture detection) → visual evidence | `video.py` | built; tested on Envision's sample video |
 | Visual evidence → **initial distribution** | `BayesianFusion.visual_distribution` | built |
 | Audio → voc2vec (preprocess → embeddings → vocalization classification) → nonverbal audio evidence | `audio_text.py` | built; classifier needs real data and a label→distribution mapping |
 | **Bayesian update** (initial × audio evidence) → **posterior distribution** | `BayesianFusion.update` / `infer` | built (posterior is order-invariant) |
-| Semantic retrieval: phrase database + vector embeddings → phrase ranking → top interpretations | not started | open questions below |
-| User confirmation | board (web, later) | not started |
-| Text-to-speech | local TTS | not started |
+| Semantic retrieval: phrase database + vector embeddings → phrase ranking → top interpretations | `retrieval.py` | built; 178 phrases |
+| User confirmation | keys 1–3 / 0 in `run.py`; web board later | built (keys) |
+| Text-to-speech | `tts.py` (offline SAPI) | built |
 Not in the diagram but in the current code: MediaPipe GestureRecognizer (message.txt) as a video source, Whisper
 transcript as an audio source. Both are kept until Sanjith says otherwise.
 
 ## Bayesian fusion — REVISED by Sanjith (supersedes the decision and learning parts below)
-Order per the diagram: video → initial distribution, audio → update. (Changed from audio-first; same posterior.)
-- Audio gives the current information: P(phrase | audio), from the vocalization and transcript sources.
-- Video updates it: posterior ∝ P(video | phrase) · P(phrase | audio), with mp_gesture and envision as sources.
+- Video gives the initial distribution P(intent | video), from the mp_gesture and envision sources.
+- Audio updates it: posterior ∝ P(audio | intent) · P(intent | video), from the vocalization and transcript
+  sources. (This was audio-first at one point; the posterior is the same in either order.)
 - The output is the updated **distribution only**: no threshold, no abstain, no learn_likelihoods, and not
   self-correcting.
-- The final answer comes from a separate **classical ML model** that reads the distribution. Sanjith will
-  specify it.
+- The final answer comes from a separate **classical ML model** reading the distribution. In the built
+  pipeline that is the phrase ranker in `retrieval.py`: a formula until confirmations are logged, then
+  logistic regression.
 
 ## Bayesian fusion (original v1 text, kept for the math)
 - Hypotheses: the phrase list (starts as message.txt's 8 phrases).
@@ -133,11 +134,16 @@ AudioPipeline(enabled, whisper_size='base.en', voc_classifier_path=...).start() 
                               'label': str|None, 'probs': {label: float}}}
 VocalizationEncoder().embed(wave_16k_mono: np.ndarray) -> np.ndarray[768]
 VocalizationClassifier.train(dataset_dirs_or_manifests) / .save(path) / .load(path) / .predict_proba(emb)
-BayesianFusion.from_json(path).update(visual: dict, audio: dict) -> {
-  'posterior': [{'phrase': str, 'p': float}],          # sorted, sums to 1
-  'decision': {'phrase': str|None, 'p': float, 'abstain': bool, 'reason': str},
-  'evidence': {source: {...what was used...}}}
-BayesianFusion.learn_likelihoods(records) -> None
+BayesianFusion.from_json(path).infer(visual: dict, audio: dict) -> {
+  'initial_distribution': {intent: p},                  # from video; sorted, sums to 1
+  'posterior': {intent: p},                             # after the audio update; sorted, sums to 1
+  'evidence': {source: {'used': bool, 'informative': bool, ...}}}
+BayesianFusion.visual_distribution(visual) / .update(initial, audio)
+
+# retrieval.py, tts.py
+PhraseRanker(PhraseDatabase(), intents).rank(posterior, k=3) -> [{'text', 'intent', 'score', 'match'}]
+PhraseRanker.log(posterior, shown, chosen)   # data/confirmations.jsonl, for train-ranker
+Speaker().say(text)
 
 # CLI
 python audio_text.py train --data data/vocalizations [more dirs/manifests] --out models/voc_clf.joblib
@@ -145,13 +151,7 @@ python audio_text.py classify some.wav
 python run.py --camera 0 --audio | --video sample.mp4 --no-audio [--no-yolo] [--no-envision]
 ```
 
-## Work split
-1. Subagent A (Sonnet): `audio_text.py` + `config/likelihoods.json` + `data/vocalizations/README.md`.
-2. Subagent B (Sonnet): `video.py`.
-3. Claude (lead): review both against this contract, write `run.py` (message.txt's panel plus envision,
-   vocalization, posterior and decision lines), then an end-to-end run on a video file and a mic test.
-
 ## Open for Sanjith
-- How envision Gesture/NoGesture should move each phrase's probability (it's neutral until you say).
-- Which vocalization classes map to which phrases, and which dataset(s) to train on first.
-- Threshold and margin for committing vs falling back to the board.
+- How envision Gesture/NoGesture should move each intent's probability (neutral until set).
+- Which vocalization classes map to which intents, and which dataset(s) or ready-made model to use first.
+- Live speed: Envision needs consecutive frames at 25–30 fps; the full pipeline runs about 1 fps on CPU.
