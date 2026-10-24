@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.idea/
+.env
+models/
+.scratch*/
+output_realtime/
+multimodal_packet.json
+multimodal_packet.tmp
+*.pt
+*.joblib
+panel_snapshot.png

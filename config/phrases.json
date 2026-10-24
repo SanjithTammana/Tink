@@ -1,0 +1,1006 @@
+{
+ "note": "Phrase database, editable. 'intent' tags the intent (hand-written seeds have no 'source'). Imported rows carry 'source' and 'match' (cosine to the nearest seed). Imported AAC messages: Vertanen & Kristensson (2011), The Imagination of Crowds, EMNLP; CC BY 4.0; aactext.org/imagine.",
+ "phrases": [
+  {
+   "text": "Yes.",
+   "intent": "Yes / I agree"
+  },
+  {
+   "text": "Yes, please.",
+   "intent": "Yes / I agree"
+  },
+  {
+   "text": "I agree with that.",
+   "intent": "Yes / I agree"
+  },
+  {
+   "text": "That's right.",
+   "intent": "Yes / I agree"
+  },
+  {
+   "text": "Okay, sounds good.",
+   "intent": "Yes / I agree"
+  },
+  {
+   "text": "No.",
+   "intent": "No / I disagree"
+  },
+  {
+   "text": "No, thank you.",
+   "intent": "No / I disagree"
+  },
+  {
+   "text": "I don't agree.",
+   "intent": "No / I disagree"
+  },
+  {
+   "text": "That's not what I meant.",
+   "intent": "No / I disagree"
+  },
+  {
+   "text": "Please stop.",
+   "intent": "No / I disagree"
+  },
+  {
+   "text": "Please look at me.",
+   "intent": "Please pay attention"
+  },
+  {
+   "text": "I have something to say.",
+   "intent": "Please pay attention"
+  },
+  {
+   "text": "Wait, listen to me.",
+   "intent": "Please pay attention"
+  },
+  {
+   "text": "Excuse me.",
+   "intent": "Please pay attention"
+  },
+  {
+   "text": "Look over there.",
+   "intent": "I want to show you something"
+  },
+  {
+   "text": "I want to show you something.",
+   "intent": "I want to show you something"
+  },
+  {
+   "text": "Can you see that?",
+   "intent": "I want to show you something"
+  },
+  {
+   "text": "Look at this.",
+   "intent": "I want to show you something"
+  },
+  {
+   "text": "I need help.",
+   "intent": "I need help"
+  },
+  {
+   "text": "Can you help me, please?",
+   "intent": "I need help"
+  },
+  {
+   "text": "Something is wrong.",
+   "intent": "I need help"
+  },
+  {
+   "text": "I'm in pain.",
+   "intent": "I need help"
+  },
+  {
+   "text": "Can you repeat that?",
+   "intent": "Can you repeat that?"
+  },
+  {
+   "text": "I didn't understand.",
+   "intent": "Can you repeat that?"
+  },
+  {
+   "text": "Please say that again, slower.",
+   "intent": "Can you repeat that?"
+  },
+  {
+   "text": "What did you say?",
+   "intent": "Can you repeat that?"
+  },
+  {
+   "text": "I want something.",
+   "intent": "I want something"
+  },
+  {
+   "text": "I'm hungry.",
+   "intent": "I want something"
+  },
+  {
+   "text": "I'm thirsty, can I have some water?",
+   "intent": "I want something"
+  },
+  {
+   "text": "Can I have that?",
+   "intent": "I want something"
+  },
+  {
+   "text": "I need a break.",
+   "intent": "I need a break"
+  },
+  {
+   "text": "I'm tired.",
+   "intent": "I need a break"
+  },
+  {
+   "text": "Can we stop for a minute?",
+   "intent": "I need a break"
+  },
+  {
+   "text": "I want to rest now.",
+   "intent": "I need a break"
+  },
+  {
+   "text": "Feeling thirsty.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.656
+  },
+  {
+   "text": "Can I have a glass of water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.614
+  },
+  {
+   "text": "I want some water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.746
+  },
+  {
+   "text": "I am hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.942
+  },
+  {
+   "text": "I am thirsty.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.764
+  },
+  {
+   "text": "Can I have some water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.842
+  },
+  {
+   "text": "I need food.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.696
+  },
+  {
+   "text": "Get me something to eat.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.671
+  },
+  {
+   "text": "I am very thirsty.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.749
+  },
+  {
+   "text": "Can you bring me water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.691
+  },
+  {
+   "text": "Hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.775
+  },
+  {
+   "text": "I am hungry, when can we eat?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.689
+  },
+  {
+   "text": "Let's go get something to eat.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.631
+  },
+  {
+   "text": "I'm thirsty",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.757
+  },
+  {
+   "text": "I am thirsty, can you get me a drink?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.859
+  },
+  {
+   "text": "I want food",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.681
+  },
+  {
+   "text": "I am still hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.813
+  },
+  {
+   "text": "Do you have any water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.632
+  },
+  {
+   "text": "Can you bring that to me?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.635
+  },
+  {
+   "text": "Will you please get me a glass of water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.614
+  },
+  {
+   "text": "I'm hungry for some spaghetti and meat balls.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.607
+  },
+  {
+   "text": "Please bring me some water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.626
+  },
+  {
+   "text": "I need water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.711
+  },
+  {
+   "text": "Can I have something to drink?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.672
+  },
+  {
+   "text": "Can you get me a glass of water",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.618
+  },
+  {
+   "text": "Can I have some water please?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.778
+  },
+  {
+   "text": "Can I have a glass of water please?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.651
+  },
+  {
+   "text": "Can I have water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.797
+  },
+  {
+   "text": "Can you bring me some water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.739
+  },
+  {
+   "text": "I am hungry, when is lunch?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.66
+  },
+  {
+   "text": "I want some food",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.675
+  },
+  {
+   "text": "I want a drink of water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.75
+  },
+  {
+   "text": "Will you pour me some water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.715
+  },
+  {
+   "text": "I am getting hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.866
+  },
+  {
+   "text": "Mom, I'm hungry!",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.747
+  },
+  {
+   "text": "I am hungry, any food for me?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.76
+  },
+  {
+   "text": "I need water, please.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.699
+  },
+  {
+   "text": "Could I please have something to drink?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.608
+  },
+  {
+   "text": "Bring the food, I am hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.751
+  },
+  {
+   "text": "Give me water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.648
+  },
+  {
+   "text": "I'm a little hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.847
+  },
+  {
+   "text": "May I have something to drink?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.627
+  },
+  {
+   "text": "Can we eat soon, I am hungry",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.701
+  },
+  {
+   "text": "I need some water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.743
+  },
+  {
+   "text": "Can you bring me some water please?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.701
+  },
+  {
+   "text": "Feeling hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.717
+  },
+  {
+   "text": "Give me something to eat.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.685
+  },
+  {
+   "text": "Can I have one?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.612
+  },
+  {
+   "text": "I am pretty hungry, can we go eat?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.686
+  },
+  {
+   "text": "I am thirsty, can you get me some water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.93
+  },
+  {
+   "text": "Need water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.673
+  },
+  {
+   "text": "Can you please get me some water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.74
+  },
+  {
+   "text": "Please give me some water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.651
+  },
+  {
+   "text": "I'm really hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.908
+  },
+  {
+   "text": "Thirsty",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.73
+  },
+  {
+   "text": "I need a drink of water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.737
+  },
+  {
+   "text": "I want one too.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.701
+  },
+  {
+   "text": "I am very hungry.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.837
+  },
+  {
+   "text": "I am getting thirsty.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.732
+  },
+  {
+   "text": "I want water.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.692
+  },
+  {
+   "text": "Can I have some chilled water, please?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.622
+  },
+  {
+   "text": "Could I have something to drink please?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.611
+  },
+  {
+   "text": "Could you get me a glass of water?",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.626
+  },
+  {
+   "text": "I need you to get me something.",
+   "intent": "I want something",
+   "source": "vertanen2011",
+   "match": 0.65
+  },
+  {
+   "text": "I need your help.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.919
+  },
+  {
+   "text": "It hurts.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.608
+  },
+  {
+   "text": "I need help as i am desperate.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.821
+  },
+  {
+   "text": "The pain is in my head.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.645
+  },
+  {
+   "text": "Help me!",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.701
+  },
+  {
+   "text": "I am hurt.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.715
+  },
+  {
+   "text": "The pain is in my arm.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.649
+  },
+  {
+   "text": "My back hurts.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.63
+  },
+  {
+   "text": "Help",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.604
+  },
+  {
+   "text": "I am feeling pain.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.763
+  },
+  {
+   "text": "Sir, can you help me?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.651
+  },
+  {
+   "text": "I am feeling numb.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.614
+  },
+  {
+   "text": "Can you help me with this?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.8
+  },
+  {
+   "text": "Could you help me?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.791
+  },
+  {
+   "text": "Will you help me?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.697
+  },
+  {
+   "text": "Help me, please.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.796
+  },
+  {
+   "text": "Please help me",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.741
+  },
+  {
+   "text": "Can you help me?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.808
+  },
+  {
+   "text": "I don't feel well.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.603
+  },
+  {
+   "text": "I need a little help.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.893
+  },
+  {
+   "text": "I badly need help.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.872
+  },
+  {
+   "text": "I feel the pain.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.714
+  },
+  {
+   "text": "I am in pain.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.93
+  },
+  {
+   "text": "Help me with this.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.713
+  },
+  {
+   "text": "Something is not right.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.756
+  },
+  {
+   "text": "My arm hurts.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.615
+  },
+  {
+   "text": "I need help with this.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.83
+  },
+  {
+   "text": "Help me really quick.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.692
+  },
+  {
+   "text": "Need help",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.784
+  },
+  {
+   "text": "Could you please help me?",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.95
+  },
+  {
+   "text": "I'm getting a headache.",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.642
+  },
+  {
+   "text": "I think I need some help!",
+   "intent": "I need help",
+   "source": "vertanen2011",
+   "match": 0.793
+  },
+  {
+   "text": "I am tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.907
+  },
+  {
+   "text": "I am exhausted.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.738
+  },
+  {
+   "text": "I'm a little tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.792
+  },
+  {
+   "text": "Want to sleep.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.612
+  },
+  {
+   "text": "I am ready to sleep.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.602
+  },
+  {
+   "text": "Need rest.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.793
+  },
+  {
+   "text": "I want to sleep now",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.704
+  },
+  {
+   "text": "I need to go to sleep now.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.723
+  },
+  {
+   "text": "I will rest for a while.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.747
+  },
+  {
+   "text": "I too want to go home now, I am too sleepy.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.616
+  },
+  {
+   "text": "I am tired I will go to bed now.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.646
+  },
+  {
+   "text": "I am tired, need some rest.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.773
+  },
+  {
+   "text": "I am feeling tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.711
+  },
+  {
+   "text": "Am tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.892
+  },
+  {
+   "text": "I need to take a break from the dinner.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.702
+  },
+  {
+   "text": "I am sleepy.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.695
+  },
+  {
+   "text": "I feel sleepy.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.614
+  },
+  {
+   "text": "I need to rest.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.859
+  },
+  {
+   "text": "Can we take a break?",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.66
+  },
+  {
+   "text": "Can I just take rest for a while?",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.634
+  },
+  {
+   "text": "I want to go back to sleep.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.633
+  },
+  {
+   "text": "I need to rest even for a few minutes.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.749
+  },
+  {
+   "text": "I am very tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.705
+  },
+  {
+   "text": "I am tired, I want to go to bed.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.615
+  },
+  {
+   "text": "Tired.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.693
+  },
+  {
+   "text": "I need to rest now",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.878
+  },
+  {
+   "text": "I have to get some rest.",
+   "intent": "I need a break",
+   "source": "vertanen2011",
+   "match": 0.799
+  },
+  {
+   "text": "Can you repeat yourself?",
+   "intent": "Can you repeat that?",
+   "source": "vertanen2011",
+   "match": 0.655
+  },
+  {
+   "text": "I do not understand.",
+   "intent": "Can you repeat that?",
+   "source": "vertanen2011",
+   "match": 0.77
+  },
+  {
+   "text": "Can you repeat that slower?",
+   "intent": "Can you repeat that?",
+   "source": "vertanen2011",
+   "match": 0.609
+  },
+  {
+   "text": "What were you saying?",
+   "intent": "Can you repeat that?",
+   "source": "vertanen2011",
+   "match": 0.808
+  },
+  {
+   "text": "Can you repeat what you just said?",
+   "intent": "Can you repeat that?",
+   "source": "vertanen2011",
+   "match": 0.726
+  },
+  {
+   "text": "Sure.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.647
+  },
+  {
+   "text": "Ya.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.663
+  },
+  {
+   "text": "Yes, of course.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.663
+  },
+  {
+   "text": "I agree with you.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.845
+  },
+  {
+   "text": "Sounds good to me.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.7
+  },
+  {
+   "text": "You're right.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.728
+  },
+  {
+   "text": "Yes I agree.",
+   "intent": "Yes / I agree",
+   "source": "vertanen2011",
+   "match": 0.751
+  },
+  {
+   "text": "That's not right.",
+   "intent": "No / I disagree",
+   "source": "vertanen2011",
+   "match": 0.662,
+   "reviewed": "retagged by hand"
+  },
+  {
+   "text": "Show me",
+   "intent": "I want to show you something",
+   "source": "vertanen2011",
+   "match": 0.633
+  },
+  {
+   "text": "Can I see that?",
+   "intent": "I want to show you something",
+   "source": "vertanen2011",
+   "match": 0.895
+  },
+  {
+   "text": "No, thanks.",
+   "intent": "No / I disagree",
+   "source": "vertanen2011",
+   "match": 0.889
+  },
+  {
+   "text": "Stop it!",
+   "intent": "No / I disagree",
+   "source": "vertanen2011",
+   "match": 0.626
+  },
+  {
+   "text": "I disagree.",
+   "intent": "No / I disagree",
+   "source": "vertanen2011",
+   "match": 0.678
+  },
+  {
+   "text": "Look at me",
+   "intent": "Please pay attention",
+   "source": "vertanen2011",
+   "match": 0.743
+  },
+  {
+   "text": "I have something to tell you.",
+   "intent": "Please pay attention",
+   "source": "vertanen2011",
+   "match": 0.764
+  },
+  {
+   "text": "Please excuse me",
+   "intent": "Please pay attention",
+   "source": "vertanen2011",
+   "match": 0.721
+  }
+ ]
+}
