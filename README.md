@@ -15,10 +15,39 @@ Then allow Camera and Microphone for your terminal or PyCharm in System Settings
 .\setup_windows.ps1
 ```
 
-Both scripts install `requirements.txt` and then `envisionhgdetector` with `--no-deps`. Tink loads only its
-LightGBM model, so TensorFlow is not needed. Model files download on first run.
+Both scripts install `requirements.txt` and then `envisionhgdetector` with `--no-deps`.
+The new session modes use NumPy/exported Envision models without requiring TensorFlow.
+After installation, follow [session model setup](docs/SESSION-SETUP.md) to prepare their local assets.
+The legacy `run.py` can download its own model files on first use; the new session modes require
+prepared local models and do not download them implicitly.
 
 ## Run
+
+### Recorded assessment with three Gemini options
+
+```powershell
+& .\.venv\Scripts\python.exe tink_session.py --assessment
+```
+
+In the existing OpenCV window: **SPACE** records audio/video, **ENTER** stops and assesses,
+**1-3** confirms/speaks an option, **R** retries, **P** opens the packet and **Q** quits.
+The backend also infers tentative partner/conversation context. No Tkinter or Django scaffolding.
+See [recorded assessment](docs/RECORDED-ASSESSMENT.md) for capture, API and Django-callable seams.
+
+### Integrated learning lab (Windows, existing local models)
+
+```powershell
+& .\.venv\Scripts\python.exe tink_session.py --record
+```
+
+This test entry point combines automatic person recovery, visible face/body/hand features,
+anonymous audiovisual motifs, the previous ASL alphabet reader, timed conversation context,
+up to four possibilities and confirmation before local speech. It needs no word/sound enrollment.
+See [the layer-test guide](docs/SESSION-LAB.md) for controls and source-attribution limits.
+Gemini text suggestions require `--gemini`; raw-audio captions separately require `--gemini-asr`.
+Put the API key only in ignored `.env`, as described in [Gemini setup](docs/GEMINI-SETUP.md).
+The commands below remain the earlier app entry point.
+
 ```bash
 .venv/bin/python run.py --camera 0 --audio          # macOS
 .venv\Scripts\python.exe run.py --camera 0 --audio  # Windows
