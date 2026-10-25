@@ -4,6 +4,8 @@ Use Python 3.11 and run commands from this repository's root. Install with
 `setup_windows.ps1` on Windows or `setup_mac.sh` on macOS. The examples below use this
 clone's Windows `.venv`; on macOS substitute `.venv/bin/python`. No sibling Tink checkout
 is required. Existing local development guides may show the author's shared environment.
+The root setup scripts also install `Tink-web/requirements.txt` for Django. Node.js is needed
+once to build the supplied static frontend; Django remains the application server.
 
 ## Prepare the model assets once
 
@@ -66,6 +68,10 @@ Copy-Item .env.example .env
 & .\.venv\Scripts\python.exe tools\audio_layer_lab.py devices
 & .\.venv\Scripts\python.exe tink_session.py --assessment
 ```
+
+For the complete Django application, run `.\run.ps1` on Windows or `bash run.sh` on macOS
+instead of the standalone OpenCV assessment command. The Django launcher builds missing
+static assets from the included lockfile and opens the local site.
 
 Choose `--device N` only if the default microphone is wrong. Device numbers are machine-specific.
 `SPACE` records, `ENTER` stops/uploads the completed clip, `1-3` confirms/speaks, and `Q` quits.

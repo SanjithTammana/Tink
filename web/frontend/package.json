@@ -1,0 +1,19 @@
+{
+  "name": "tink-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "test": "node --test src/features/flightPath.test.js src/lib/*.test.js",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.12"
+  }
+}

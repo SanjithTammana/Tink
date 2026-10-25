@@ -1,0 +1,2 @@
+# Only the website needs Django. The AI models run in a separate engine process using the root backend.
+django>=4.2,<6

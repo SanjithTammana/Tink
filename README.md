@@ -23,6 +23,26 @@ prepared local models and do not download them implicitly.
 
 ## Run
 
+### Django application
+
+The complete web application is Django-based. It serves Abhiram's supplied frontend and
+supervises the native camera/audio engine in a separate process. No additional frontend
+framework conversion is required.
+
+After environment and [model setup](docs/SESSION-SETUP.md), install Node.js once for building
+the supplied static assets. From this repository root:
+
+```powershell
+.\run.ps1
+```
+
+On macOS, use `bash run.sh`. The application runs at `http://127.0.0.1:8000`; it is a local
+desktop demonstration, not a public production deployment. Home records a clip and presents
+three confirmed-speech options; ASL provides the earlier alphabet reader. See
+[Django application details](Tink-web/README.md). `TINK_PYTHON` can select an existing backend
+environment. Local credentials, recordings, model weights, dependency folders and generated
+builds remain Git-ignored.
+
 ### Recorded assessment with three Gemini options
 
 ```powershell
@@ -31,7 +51,8 @@ prepared local models and do not download them implicitly.
 
 In the existing OpenCV window: **SPACE** records audio/video, **ENTER** stops and assesses,
 **1-3** confirms/speaks an option, **R** retries, **P** opens the packet and **Q** quits.
-The backend also infers tentative partner/conversation context. No Tkinter or Django scaffolding.
+The backend also infers tentative partner/conversation context. This command opens the standalone
+OpenCV interface; use the Django application above for the complete web interface.
 See [recorded assessment](docs/RECORDED-ASSESSMENT.md) for capture, API and Django-callable seams.
 
 ### Integrated learning lab (Windows, existing local models)

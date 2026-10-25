@@ -10,7 +10,8 @@ py -3.11 -m venv .venv
 .venv\Scripts\python.exe -m pip install --upgrade pip
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m pip install --no-deps envisionhgdetector==3.0.8
+.venv\Scripts\python.exe -m pip install -r Tink-web\requirements.txt
 .venv\Scripts\python.exe -c "import video, audio_text, retrieval, tts; print('Tink imports OK')"
 
 Write-Host ''
-Write-Host 'Done. Run: .venv\Scripts\python.exe run.py --camera 0 --audio'
+Write-Host 'Done. Prepare models (docs/SESSION-SETUP.md), then run: .\run.ps1'

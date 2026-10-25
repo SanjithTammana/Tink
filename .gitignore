@@ -16,3 +16,9 @@ multimodal_packet.tmp
 panel_snapshot.png
 data/dialogue/
 data/signs/
+node_modules/
+web/frontend/dist/
+*.log
+.DS_Store
+__MACOSX/
+*.sqlite3
