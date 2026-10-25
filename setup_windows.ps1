@@ -13,4 +13,4 @@ py -3.11 -m venv .venv
 .venv\Scripts\python.exe -c "import video, audio_text, retrieval, tts; print('Tink imports OK')"
 
 Write-Host ''
-Write-Host 'Done. Run: .venv\Scripts\python.exe run.py --camera 0 --audio --no-yolo'
+Write-Host 'Done. Run: .venv\Scripts\python.exe run.py --camera 0 --audio'

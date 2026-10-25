@@ -9,6 +9,7 @@ import importlib
 import importlib.util
 import io
 import sys
+import threading
 import types
 import math
 import time
@@ -145,6 +146,17 @@ class VideoAnalyzer:
         self.hand_history = deque(maxlen=12)
 
     def analyze(self, frame, ts_ms):
+        result = self.observe(frame, ts_ms)
+        result['envision'] = self.envision_result(frame)
+        return result
+
+    def envision_result(self, frame):
+        if self.envision:
+            return self.envision.analyze(frame)
+        return {'status': self.envision_status, 'probs': None, 'label': None}
+
+    def observe(self, frame, ts_ms):
+        """Everything except Envision: YOLO people, MediaPipe gestures, face blendshapes, hand motion."""
         ts_ms = max(int(ts_ms), self.prev_ts + 1)
         self.prev_ts = ts_ms
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -192,19 +204,106 @@ class VideoAnalyzer:
             if len(recent) >= 5:
                 displacement = sum(math.dist(a, b) for a, b in zip(recent, recent[1:]))
                 motion = 'hand moving' if displacement > 0.12 else 'hand relatively still'
-        if self.envision:
-            envision = self.envision.analyze(frame)
-        else:
-            envision = {'status': self.envision_status, 'probs': None, 'label': None}
         return {'timestamp_ms': ts_ms, 'people': self.last_boxes,
                 'gestures': gestures, 'face_movements': observable,
-                'hand_motion': motion, 'envision': envision}
+                'hand_motion': motion}
 
     def close(self):
         self.gesture.close()
         self.face.close()
         if self.envision:
             self.envision.close()
+
+
+class LatestFrameWorker:
+    """Runs fn on the newest submitted frame in a background thread; frames that arrive while it is busy are
+    dropped, so the caller never waits on it."""
+
+    def __init__(self, fn, name):
+        self.fn = fn
+        self.cond = threading.Condition()
+        self.pending = None
+        self.result = None
+        self.done = deque(maxlen=30)
+        self.stopped = False
+        self.warned = False
+        self.thread = threading.Thread(target=self.loop, name=name, daemon=True)
+        self.thread.start()
+
+    def submit(self, *args):
+        with self.cond:
+            self.pending = args
+            self.cond.notify()
+
+    def loop(self):
+        while True:
+            with self.cond:
+                while self.pending is None and not self.stopped:
+                    self.cond.wait()
+                if self.stopped:
+                    return
+                args, self.pending = self.pending, None
+            try:
+                out = self.fn(*args)
+            except Exception as e:
+                if not self.warned:
+                    print(f'{self.thread.name} error:', e)
+                    self.warned = True
+                continue
+            with self.cond:
+                self.result = out
+                self.done.append(time.monotonic())
+
+    def fps(self):
+        with self.cond:
+            if len(self.done) < 2:
+                return 0.0
+            return (len(self.done) - 1) / max(self.done[-1] - self.done[0], 1e-6)
+
+    def latest(self):
+        with self.cond:
+            return self.result
+
+    def close(self):
+        with self.cond:
+            self.stopped = True
+            self.cond.notify()
+        self.thread.join(timeout=5)
+
+
+class ThreadedVideoAnalyzer:
+    """MediaPipe (+YOLO) and Envision each run in their own thread on the newest camera frame, so the display
+    loop runs at camera rate. Each part runs as fast as the CPU allows; Envision's rate is reported because its
+    velocity features were trained at 25-30 fps."""
+
+    EMPTY = {'timestamp_ms': 0, 'people': [], 'gestures': [], 'face_movements': {},
+             'hand_motion': 'insufficient history'}
+
+    def __init__(self, analyzer):
+        self.analyzer = analyzer
+        self.mediapipe = LatestFrameWorker(analyzer.observe, 'mediapipe')
+        self.envision = LatestFrameWorker(analyzer.envision_result, 'envision') if analyzer.envision else None
+
+    def submit(self, frame, ts_ms):
+        self.mediapipe.submit(frame, ts_ms)
+        if self.envision:
+            self.envision.submit(frame)
+
+    def latest(self):
+        result = dict(self.mediapipe.latest() or self.EMPTY)
+        if self.envision:
+            result['envision'] = self.envision.latest() or {'status': 'starting', 'probs': None, 'label': None}
+        else:
+            result['envision'] = self.analyzer.envision_result(None)
+        result['rates'] = {'mediapipe': self.mediapipe.fps(),
+                           'envision': self.envision.fps() if self.envision else 0.0}
+        return result
+
+    def close(self):
+        self.mediapipe.close()
+        if self.envision:
+            self.envision.close()
+        self.analyzer.close()
 
 
 def second_summary(sec, rows):

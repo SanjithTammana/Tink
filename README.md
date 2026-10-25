@@ -20,8 +20,8 @@ LightGBM model, so TensorFlow is not needed. Model files download on first run.
 
 ## Run
 ```bash
-.venv/bin/python run.py --camera 0 --audio --no-yolo          # macOS
-.venv\Scripts\python.exe run.py --camera 0 --audio --no-yolo  # Windows
+.venv/bin/python run.py --camera 0 --audio          # macOS
+.venv\Scripts\python.exe run.py --camera 0 --audio  # Windows
 ```
 Keys: **1–3** confirm an interpretation and speak it, **0** rejects all, **Q** quits. `--video file.mp4`
 replaces the camera; `--headless --max-frames N` runs without a window.
