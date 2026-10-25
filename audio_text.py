@@ -359,7 +359,9 @@ class BayesianFusion:
         terms = [t for t in (self.term(source, q) for q in qs) if t is not None]
         evidence[source] = {'used': bool(terms),
                             'informative': any(np.ptp(t) > 1e-9 for t in terms), **detail}
-        return logp + (sum(terms) if terms else 0.0)
+        # weight < 1 tempers a source whose evidence overlaps another's (same frames, same body)
+        weight = float(self.config['sources'].get(source, {}).get('weight', 1.0))
+        return logp + weight * (sum(terms) if terms else 0.0)
 
     def _dist(self, logp):
         m = logp.max()
@@ -398,7 +400,23 @@ class BayesianFusion:
         logp = self._combine(logp, 'envision', [env['probs']] if ok else [],
                              {'probs': env['probs']} if ok else {'status': env.get('status', 'missing')},
                              evidence)
+        head = visual.get('head') or {}
+        ok = head.get('status') == 'ok' and head.get('q')
+        logp = self._combine(logp, 'head', [head['q']] if ok else [],
+                             {'q': head['q']} if ok else {'status': head.get('status', 'missing')}, evidence)
+        user = next((p for p in visual.get('people') or [] if p['id'] == visual.get('target_id')), None)
+        sig = (user or {}).get('signals')
+        arm = None
+        if sig:
+            wave, hold = sig['wave'], sig['hold'] * (1 - sig['wave'])
+            arm = {'wave': wave, 'hold': hold, 'none': max(0.0, 1 - wave - hold)}
+        logp = self._combine(logp, 'arm', [arm] if arm else [],
+                             {'q': arm} if arm else {'status': 'no tracked user'}, evidence)
         return self._dist(logp), evidence
+
+    def make_filter(self):
+        f = self.config.get('filter', {})
+        return BeliefFilter(self.phrases, self.prior(), f.get('half_life_s', 2.0), f.get('evidence_rate', 1.5))
 
     def visual_distribution(self, visual):
         """Initial distribution {phrase: P(phrase | video)}, sorted, starting from the prior."""
@@ -414,6 +432,39 @@ class BayesianFusion:
         initial, ev_video = self._video(visual)
         post, ev_audio = self._audio(audio, initial)
         return {'initial_distribution': initial, 'posterior': post, 'evidence': {**ev_video, **ev_audio}}
+
+
+class BeliefFilter:
+    """Temporal Bayesian filter over intents: belief builds up while a signal is held and drifts back to the
+    prior after it stops, at any frame rate.
+
+    Each step, with dt seconds since the last one:
+      predict: b <- s * b + (1 - s) * prior,  s = 0.5 ** (dt / half_life_s)
+      update:  log b <- log b + evidence_rate * dt * (log P(intent | evidence now) - log prior), normalized
+    Scaling the evidence by dt tempers it by elapsed time: one second of a held signal adds the same evidence
+    at 5 or 30 fps, and an unchanged snapshot repeated by a fast display loop is not counted once per frame.
+    """
+
+    def __init__(self, phrases, prior, half_life_s=2.0, evidence_rate=1.5):
+        self.phrases = list(phrases)
+        self.prior = np.asarray(prior, dtype=float)
+        self.half_life_s, self.rate = float(half_life_s), float(evidence_rate)
+        self.reset()
+
+    def reset(self):
+        self.belief = self.prior.copy()
+        self.t = None
+
+    def step(self, posterior, t):
+        dt = 0.0 if self.t is None else min(max(t - self.t, 0.0), 1.0)   # cap gaps (pauses, stalls) at 1 s
+        self.t = t
+        s = 0.5 ** (dt / self.half_life_s)
+        b = s * self.belief + (1 - s) * self.prior
+        loglik = np.log(np.maximum([posterior.get(p, 0.0) for p in self.phrases], 1e-12)) - np.log(self.prior)
+        logb = np.log(np.maximum(b, 1e-12)) + self.rate * dt * loglik
+        logb -= logb.max()
+        self.belief = np.exp(logb) / np.exp(logb).sum()
+        return dict(sorted(zip(self.phrases, self.belief.tolist()), key=lambda x: -x[1]))
 
 
 def cmd_train(args):

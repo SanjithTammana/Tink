@@ -70,7 +70,15 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
         line(f"fps  display {display_fps:.0f} | track {rates['tracker']:.0f} | mediapipe {rates['mediapipe']:.0f}"
              f" | envision {rates['envision']:.0f}",
              WHITE if rates['envision'] >= 20 or not env.get('probs') else BLUE)
-    line('Motion: ' + visual['hand_motion'])
+    head = visual.get('head') or {}
+    if head.get('q'):
+        q = head['q']
+        line(f"Head: nod {q['nod']:.2f}  shake {q['shake']:.2f}   (pitch {head['pitch']:.0f}, yaw {head['yaw']:.0f})")
+    else:
+        line(f"Head: {head.get('status', 'missing')}")
+    user = next((p for p in visual.get('people', []) if p['id'] == target_id), None)
+    if user and user.get('signals'):
+        line(f"Arm: hold {user['signals']['hold']:.2f}  wave {user['signals']['wave']:.2f}")
     face = sorted(visual['face_movements'].items(), key=lambda z: -z[1])[:2]
     line('Face (not emotion): ' + ', '.join(f'{k} {v*100:.0f}%' for k, v in face))
     header('AUDIO EVIDENCE')
@@ -80,11 +88,11 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
         line(f"Vocalization: {voc['label']} {voc['probs'][voc['label']]*100:.0f}%")
     else:
         line(f"Vocalization: {voc.get('status', 'missing')}   [{audio.get('status', '')}]")
-    header('INITIAL DISTRIBUTION (video)')
-    for intent, p in list(result['initial_distribution'].items())[:3]:
-        line(f'{p*100:5.1f}%  {intent}')
-    header('POSTERIOR (video + audio)')
-    for intent, p in list(result['posterior'].items())[:3]:
+    header('DISTRIBUTIONS (this moment)')
+    (i0, p0), (q0, r0) = next(iter(result['initial_distribution'].items())), next(iter(result['posterior'].items()))
+    line(f'Video {p0*100:4.1f}% {i0[:20]}  |  +Audio {r0*100:4.1f}% {q0[:20]}')
+    header('BELIEF (builds while a signal is held)')
+    for intent, p in list(result['belief'].items())[:3]:
         line(f'{p*100:5.1f}%  {intent}')
     header('TOP INTERPRETATIONS - press 1-3, 0 = none')
     for i, t in enumerate(top, 1):
@@ -117,6 +125,8 @@ def main():
     args = parser.parse_args()
 
     fusion = BayesianFusion.from_json()
+    belief_filter = fusion.make_filter()
+    belief_user = None
     ranker = PhraseRanker(PhraseDatabase(), fusion.phrases)
     speaker = Speaker(enabled=not args.no_tts)
     audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper)
@@ -158,7 +168,11 @@ def main():
                 latest = visual.analyze(frame, ts)
             ap = audio.get()
             result = fusion.infer(latest, ap)
-            top = ranker.rank(result['posterior'], k=args.top)
+            if latest.get('target_id') != belief_user:   # a different person: start their belief fresh
+                belief_filter.reset()
+                belief_user = latest.get('target_id')
+            result['belief'] = belief_filter.step(result['posterior'], ts / 1000)
+            top = ranker.rank(result['belief'], k=args.top)
             shown.append(time.monotonic())
             display_fps = (len(shown) - 1) / max(shown[-1] - shown[0], 1e-6) if len(shown) > 1 else 0.0
             panel = draw_panel(frame, latest, ap, result, top, notice, display_fps)
@@ -169,7 +183,7 @@ def main():
                     ppl = {p['id']: p.get('hands') for p in latest.get('people', [])}
                     print(f"frame {frame_index}: people={len(ppl)} ids={list(ppl)} user={latest.get('target_id')} "
                           f"hands={ppl.get(latest.get('target_id'))} envision={latest['envision']['status']} "
-                          f"top={list(result['posterior'].items())[0]} say={top[0]['text']!r} "
+                          f"belief={list(result['belief'].items())[0]} say={top[0]['text']!r} "
                           f"fps display={display_fps:.1f} mediapipe={rates.get('mediapipe', 0):.1f} "
                           f"envision={rates.get('envision', 0):.1f}")
                 if args.max_frames and frame_index >= args.max_frames:
@@ -182,7 +196,7 @@ def main():
                 packet = {'timestamp': datetime.now(timezone.utc).isoformat(),
                           'visual': latest, 'audio': ap,
                           'initial_distribution': result['initial_distribution'],
-                          'posterior': result['posterior'], 'evidence': result['evidence'],
+                          'posterior': result['posterior'], 'belief': result['belief'], 'evidence': result['evidence'],
                           'top_interpretations': top,
                           'score_note': 'hand-set placeholder likelihoods; not calibrated probabilities'}
                 tmp = ROOT / 'multimodal_packet.tmp'
@@ -195,10 +209,10 @@ def main():
             if ord('1') <= key < ord('1') + len(top):
                 chosen = top[key - ord('1')]['text']
                 speaker.say(chosen)
-                ranker.log(result['posterior'], top, chosen)
+                ranker.log(result['belief'], top, chosen)
                 notice = ('Spoke: ' + chosen, time.monotonic())
             elif key == ord('0'):
-                ranker.log(result['posterior'], top, None)
+                ranker.log(result['belief'], top, None)
                 notice = ('Rejected - use the board', time.monotonic())
             elif key in (ord('n'), ord('N')) and visual.tracker:
                 picked = worker.select_next() if worker else visual.tracker.select_next()

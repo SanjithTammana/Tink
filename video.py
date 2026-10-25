@@ -120,6 +120,65 @@ class EnvisionGesture:
 KP = {'nose': 0, 'l_shoulder': 5, 'r_shoulder': 6, 'l_elbow': 7, 'r_elbow': 8, 'l_wrist': 9, 'r_wrist': 10}
 
 
+def reversals(values, step):
+    """Direction reversals in a 1-D series, with hysteresis: a swing counts only once the value has moved at
+    least `step` back from the last extreme, so tracking jitter below `step` never counts."""
+    count, direction, extreme = 0, 0, values[0]
+    for v in values[1:]:
+        if direction == 0:
+            if abs(v - extreme) >= step:
+                direction, extreme = (1 if v > extreme else -1), v
+        elif direction > 0:
+            if v > extreme:
+                extreme = v
+            elif extreme - v >= step:
+                count, direction, extreme = count + 1, -1, v
+        else:
+            if v < extreme:
+                extreme = v
+            elif v - extreme >= step:
+                count, direction, extreme = count + 1, 1, v
+    return count
+
+
+def head_angles(matrix):
+    """Pitch and yaw in degrees from MediaPipe's 4x4 facial transformation matrix (rotation part)."""
+    r = np.asarray(matrix)[:3, :3]
+    pitch = math.degrees(math.atan2(r[2, 1], r[2, 2]))
+    yaw = math.degrees(math.atan2(-r[2, 0], math.hypot(r[2, 1], r[2, 2])))
+    return pitch, yaw
+
+
+class HeadGesture:
+    """Nod / shake from head pitch and yaw over the last window_s seconds.
+
+    Count reversals in pitch and in yaw (hysteresis step_deg). Dominance d = pitch range / (pitch + yaw range)
+    separates the axes: nod = min(1, pitch reversals / 2) * d, shake = min(1, yaw reversals / 2) * (1 - d),
+    still = the rest. Two reversals is one full down-up-down (or left-right-left). The 4 degree step and
+    1.5 s window are heuristics; the sources we found suggest about 5 degrees within 1.5 s.
+    """
+
+    def __init__(self, window_s=1.5, step_deg=4.0):
+        self.window_s, self.step = window_s, step_deg
+        self.hist = deque()
+
+    def reset(self):
+        self.hist.clear()
+
+    def update(self, t, pitch, yaw):
+        self.hist.append((t, pitch, yaw))
+        while t - self.hist[0][0] > self.window_s:
+            self.hist.popleft()
+        if len(self.hist) < 4 or self.hist[-1][0] - self.hist[0][0] < 0.5:
+            return {'status': 'warming up', 'q': None, 'pitch': pitch, 'yaw': yaw}
+        ps, ys = [h[1] for h in self.hist], [h[2] for h in self.hist]
+        n_p, n_y = reversals(ps, self.step), reversals(ys, self.step)
+        d = (max(ps) - min(ps)) / (max(ps) - min(ps) + max(ys) - min(ys) + 1e-6)
+        nod, shake = min(1.0, n_p / 2) * d, min(1.0, n_y / 2) * (1 - d)
+        return {'status': 'ok', 'pitch': round(pitch, 1), 'yaw': round(yaw, 1),
+                'q': {'nod': round(nod, 3), 'shake': round(shake, 3), 'still': round(max(0.0, 1 - nod - shake), 3)}}
+
+
 def crop_box(frame, bbox, margin=0.15):
     """Person box (x1, y1, x2, y2) grown by margin on each side, clipped to the frame."""
     h, w = frame.shape[:2]
@@ -136,11 +195,18 @@ class PersonTracker:
     """Every person: box, persistent ID (ByteTrack) and COCO body keypoints (YOLO11n-pose). One person is the
     target (the user); only the target's crop goes to the single-person models (Envision, hands, face).
 
-    Hand kinematics per person, from keypoints: wrist speed in shoulder-widths per second over ~0.5 s (scale-free
-    across distance to camera) and whether each wrist is above its shoulder.
+    Hand kinematics per person, from keypoints. Wrists are measured relative to the shoulder midpoint in
+    shoulder widths, so walking or leaning does not count as hand motion and distance to the camera cancels:
+    - speed: wrist displacement over the last 0.6 s, shoulder widths per second;
+    - raised: wrist above its shoulder;
+    - hold (HOLD_S window): raised fraction * exp(-path speed / HOLD_SPEED) * min(1, span / HOLD_S);
+    - wave (WAVE_S window): raised fraction * min(1, horizontal reversals / 2), hysteresis WAVE_STEP.
+    hold and wave are 0..1 scores per person (max over the two hands). The constants are heuristics.
     """
+    HOLD_S, HOLD_SPEED = 1.0, 0.5
+    WAVE_S, WAVE_STEP = 1.5, 0.15
 
-    def __init__(self, model='yolo11n-pose.pt', imgsz=416, conf=0.4, history_s=0.6):
+    def __init__(self, model='yolo11n-pose.pt', imgsz=416, conf=0.4, history_s=2.0):
         from ultralytics import YOLO
         self.model = YOLO(model)
         self.imgsz, self.conf, self.history_s = imgsz, conf, history_s
@@ -176,26 +242,48 @@ class PersonTracker:
     def kinematics(self, tid, kp, t):
         pt = lambda name: kp[KP[name]] if kp[KP[name]][2] > 0.3 else None   # (x, y, conf)
         ls, rs = pt('l_shoulder'), pt('r_shoulder')
-        scale = float(np.hypot(*(ls[:2] - rs[:2]))) if ls is not None and rs is not None else None
-        out, now = {'hands': {}}, {}
+        out = {'hands': {}, 'signals': {'hold': 0.0, 'wave': 0.0}}
+        if ls is None or rs is None:
+            return out
+        scale = float(np.hypot(*(ls[:2] - rs[:2])))
+        if scale <= 1:
+            return out
+        mid = (ls[:2] + rs[:2]) / 2
+        now = {}
         for side, wrist, shoulder in (('left', 'l_wrist', ls), ('right', 'r_wrist', rs)):
             w = pt(wrist)
             if w is None:
                 continue
-            now[side] = w[:2]
-            out['hands'][side] = {'raised': bool(shoulder is not None and w[1] < shoulder[1]), 'speed': None}
+            raised = bool(w[1] < shoulder[1])
+            now[side] = ((w[:2] - mid) / scale, raised)
+            out['hands'][side] = {'raised': raised, 'speed': None}
         hist = self.history.setdefault(tid, deque())
-        if scale and scale > 1:
-            hist.append((t, now, scale))
+        hist.append((t, now))
         while hist and t - hist[0][0] > self.history_s:
             hist.popleft()
-        if len(hist) >= 2:
-            (t0, first, s0), (t1, last, s1) = hist[0], hist[-1]
-            for side in out['hands']:
-                if side in first and side in last and t1 > t0:
-                    d = float(np.hypot(*(last[side] - first[side])))
-                    out['hands'][side]['speed'] = round(d / ((s0 + s1) / 2) / (t1 - t0), 2)
+        for side in out['hands']:
+            pts = [(ti, s[side][0], s[side][1]) for ti, s in hist if side in s]
+            recent = [p for p in pts if t - p[0] <= 0.6]
+            if len(recent) >= 2 and recent[-1][0] > recent[0][0]:
+                d = float(np.hypot(*(recent[-1][1] - recent[0][1])))
+                out['hands'][side]['speed'] = round(d / (recent[-1][0] - recent[0][0]), 2)
+            hold, wave = self.arm_signals(pts, t)
+            out['signals']['hold'] = max(out['signals']['hold'], hold)
+            out['signals']['wave'] = max(out['signals']['wave'], wave)
         return out
+
+    def arm_signals(self, pts, t):
+        """(hold, wave) scores for one wrist from [(t, xy relative to shoulders, raised)]."""
+        hold = wave = 0.0
+        win = [p for p in pts if t - p[0] <= self.HOLD_S]
+        if len(win) >= 3 and win[-1][0] - win[0][0] >= 0.3:
+            span = win[-1][0] - win[0][0]
+            path = sum(float(np.hypot(*(b[1] - a[1]))) for a, b in zip(win, win[1:])) / span
+            hold = np.mean([p[2] for p in win]) * math.exp(-path / self.HOLD_SPEED) * min(1.0, span / self.HOLD_S)
+        win = [p for p in pts if t - p[0] <= self.WAVE_S]
+        if len(win) >= 4:
+            wave = np.mean([p[2] for p in win]) * min(1.0, reversals([p[1][0] for p in win], self.WAVE_STEP) / 2)
+        return round(float(hold), 3), round(float(wave), 3)
 
     def target(self):
         return next((p for p in self.people if p['id'] == self.target_id), None)
@@ -225,7 +313,8 @@ class VideoAnalyzer:
             vision.FaceLandmarkerOptions(
                 base_options=opts(model_asset_buffer=model_bytes(FACE_URL, MODELS/'face_landmarker.task')),
                 running_mode=vision.RunningMode.VIDEO, num_faces=1,
-                output_face_blendshapes=True))
+                output_face_blendshapes=True, output_facial_transformation_matrixes=True))
+        self.head = HeadGesture()
         self.tracker = PersonTracker() if use_tracker else None
         self.tracker_warned = False
         self.envision = None
@@ -237,8 +326,8 @@ class VideoAnalyzer:
                 print('Envision init error:', e)
                 self.envision_status = f'error: {e}'
         self.envision_person = None
-        self.observe_person = None
-        self.prev_ts = -1
+        self.hands_person = self.face_person = None
+        self.hands_ts = self.face_ts = -1     # each MediaPipe task needs its own increasing timestamps
         self.hand_history = deque(maxlen=12)
 
     def analyze(self, frame, ts_ms):
@@ -248,6 +337,10 @@ class VideoAnalyzer:
         result['envision'] = self.envision_result(crop, pid)
         result.update(tracked)
         return result
+
+    def observe(self, frame, ts_ms, person_id=None):
+        """Hands and face together (the unthreaded path)."""
+        return {**self.observe_hands(frame, ts_ms, person_id), **self.observe_face(frame, ts_ms, person_id)}
 
     def track(self, frame, ts_ms=None):
         """{'people': [{'id', 'bbox', 'score', 'hands'}], 'target_id'}; empty when the tracker is off."""
@@ -276,18 +369,39 @@ class VideoAnalyzer:
             return self.envision.analyze(frame)
         return {'status': self.envision_status, 'probs': None, 'label': None}
 
-    def observe(self, frame, ts_ms, person_id=None):
-        """MediaPipe hand gestures, face blendshapes and hand motion on one person's crop (or the frame)."""
-        if person_id != self.observe_person:
-            self.hand_history.clear()
-            self.observe_person = person_id
-        ts_ms = max(int(ts_ms), self.prev_ts + 1)
-        self.prev_ts = ts_ms
+    def mp_image(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        image = self.mp.Image(image_format=self.mp.ImageFormat.SRGB,
-                              data=np.ascontiguousarray(rgb))
-        g = self.gesture.recognize_for_video(image, ts_ms)
-        f = self.face.detect_for_video(image, ts_ms)
+        return self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb))
+
+    def observe_face(self, frame, ts_ms, person_id=None):
+        """Face blendshapes and head pose -> nod/shake, on one person's crop (or the frame)."""
+        if person_id != self.face_person:
+            self.head.reset()
+            self.face_person = person_id
+        self.face_ts = ts_ms = max(int(ts_ms), self.face_ts + 1)
+        f = self.face.detect_for_video(self.mp_image(frame), ts_ms)
+        shapes = {}
+        if f.face_blendshapes:
+            shapes = {c.category_name: round(float(c.score), 4) for c in f.face_blendshapes[0]}
+        # Observable facial movements only; do not infer emotion from these.
+        observable = {k: shapes.get(k, 0.0) for k in (
+            'mouthSmileLeft', 'mouthSmileRight', 'jawOpen',
+            'browInnerUp', 'eyeBlinkLeft', 'eyeBlinkRight',
+            'mouthFrownLeft', 'mouthFrownRight')}
+        if f.facial_transformation_matrixes:
+            head = self.head.update(ts_ms / 1000, *head_angles(f.facial_transformation_matrixes[0]))
+        else:
+            self.head.reset()
+            head = {'status': 'no face', 'q': None}
+        return {'face_movements': observable, 'head': head}
+
+    def observe_hands(self, frame, ts_ms, person_id=None):
+        """MediaPipe hand gestures and hand motion on one person's crop (or the frame)."""
+        if person_id != self.hands_person:
+            self.hand_history.clear()
+            self.hands_person = person_id
+        self.hands_ts = ts_ms = max(int(ts_ms), self.hands_ts + 1)
+        g = self.gesture.recognize_for_video(self.mp_image(frame), ts_ms)
         gestures = []
         for i, choices in enumerate(g.gestures):
             if not choices:
@@ -297,15 +411,6 @@ class VideoAnalyzer:
                              'alternatives': [
                                  {'label': c.category_name, 'score': float(c.score)}
                                  for c in choices[:5]]})
-        shapes = {}
-        if f.face_blendshapes:
-            shapes = {c.category_name: round(float(c.score), 4)
-                      for c in f.face_blendshapes[0]}
-        # Observable facial movements only; do not infer emotion from these.
-        observable = {k: shapes.get(k, 0.0) for k in (
-            'mouthSmileLeft', 'mouthSmileRight', 'jawOpen',
-            'browInnerUp', 'eyeBlinkLeft', 'eyeBlinkRight',
-            'mouthFrownLeft', 'mouthFrownRight')}
         hand_centers = []
         for hand in g.hand_landmarks:
             hand_centers.append((float(hand[0].x), float(hand[0].y)))
@@ -316,8 +421,7 @@ class VideoAnalyzer:
             if len(recent) >= 5:
                 displacement = sum(math.dist(a, b) for a, b in zip(recent, recent[1:]))
                 motion = 'hand moving' if displacement > 0.12 else 'hand relatively still'
-        return {'timestamp_ms': ts_ms, 'gestures': gestures, 'face_movements': observable,
-                'hand_motion': motion}
+        return {'timestamp_ms': ts_ms, 'gestures': gestures, 'hand_motion': motion}
 
     def close(self):
         self.gesture.close()
@@ -388,12 +492,14 @@ class ThreadedVideoAnalyzer:
     part runs as fast as the CPU allows; Envision's rate is reported because its velocity features were trained
     at 25-30 fps."""
 
-    EMPTY = {'timestamp_ms': 0, 'gestures': [], 'face_movements': {}, 'hand_motion': 'insufficient history'}
+    EMPTY_HANDS = {'timestamp_ms': 0, 'gestures': [], 'hand_motion': 'insufficient history'}
+    EMPTY_FACE = {'face_movements': {}, 'head': {'status': 'starting', 'q': None}}
 
     def __init__(self, analyzer):
         self.analyzer = analyzer
         self.tracker = LatestFrameWorker(analyzer.track, 'tracker') if analyzer.tracker else None
-        self.mediapipe = LatestFrameWorker(self._observe, 'mediapipe')
+        self.mediapipe = LatestFrameWorker(self._hands, 'hands')
+        self.face = LatestFrameWorker(self._face, 'face')   # own thread: nod/shake needs head pose at ~10+ fps
         self.envision = LatestFrameWorker(self._envision, 'envision') if analyzer.envision else None
 
     def tracked(self):
@@ -402,16 +508,20 @@ class ThreadedVideoAnalyzer:
             out['target_id'] = self.analyzer.tracker.target_id   # live, so a manual switch shows at once
         return out
 
-    def _observe(self, frame, ts_ms):
+    def _hands(self, frame, ts_ms):
         crop, pid = self.analyzer.target_crop(frame, self.tracked())
-        return self.analyzer.observe(crop, ts_ms, pid)
+        return self.analyzer.observe_hands(crop, ts_ms, pid)
+
+    def _face(self, frame, ts_ms):
+        crop, pid = self.analyzer.target_crop(frame, self.tracked())
+        return self.analyzer.observe_face(crop, ts_ms, pid)
 
     def _envision(self, frame):
         crop, pid = self.analyzer.target_crop(frame, self.tracked())
         return self.analyzer.envision_result(crop, pid)
 
     def submit(self, frame, ts_ms):
-        for worker in (self.tracker, self.mediapipe, self.envision):
+        for worker in (self.tracker, self.mediapipe, self.face, self.envision):
             if worker:
                 worker.submit(frame) if worker is self.envision else worker.submit(frame, ts_ms)
 
@@ -419,18 +529,19 @@ class ThreadedVideoAnalyzer:
         return self.analyzer.tracker.select_next() if self.analyzer.tracker else None
 
     def latest(self):
-        result = dict(self.mediapipe.latest() or self.EMPTY)
+        result = {**(self.mediapipe.latest() or self.EMPTY_HANDS), **(self.face.latest() or self.EMPTY_FACE)}
         result.update(self.tracked())
         if self.envision:
             result['envision'] = self.envision.latest() or {'status': 'starting', 'probs': None, 'label': None}
         else:
             result['envision'] = self.analyzer.envision_result(None)
         result['rates'] = {name: (w.fps() if w else 0.0) for name, w in
-                           (('tracker', self.tracker), ('mediapipe', self.mediapipe), ('envision', self.envision))}
+                           (('tracker', self.tracker), ('mediapipe', self.mediapipe), ('face', self.face),
+                            ('envision', self.envision))}
         return result
 
     def close(self):
-        for worker in (self.tracker, self.mediapipe, self.envision):
+        for worker in (self.tracker, self.mediapipe, self.face, self.envision):
             if worker:
                 worker.close()
         self.analyzer.close()

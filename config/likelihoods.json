@@ -13,50 +13,404 @@
   "sources": {
     "mp_gesture": {
       "note": "Hand-coded placeholder, not learned: converted from the communication_live.py PHRASES weights w as P(label | phrase) proportional to exp(w), normalized per phrase over the MediaPipe gesture label set (w = 0 when absent).",
-      "labels": ["None", "Closed_Fist", "Open_Palm", "Pointing_Up", "Thumb_Down", "Thumb_Up", "Victory", "ILoveYou"],
+      "labels": [
+        "None",
+        "Closed_Fist",
+        "Open_Palm",
+        "Pointing_Up",
+        "Thumb_Down",
+        "Thumb_Up",
+        "Victory",
+        "ILoveYou"
+      ],
       "table": {
-        "Yes / I agree": {"None": 0.048867, "Closed_Fist": 0.048867, "Open_Palm": 0.048867, "Pointing_Up": 0.048867, "Thumb_Down": 0.048867, "Thumb_Up": 0.657932, "Victory": 0.048867, "ILoveYou": 0.048867},
-        "No / I disagree": {"None": 0.048867, "Closed_Fist": 0.048867, "Open_Palm": 0.048867, "Pointing_Up": 0.048867, "Thumb_Down": 0.657932, "Thumb_Up": 0.048867, "Victory": 0.048867, "ILoveYou": 0.048867},
-        "Please pay attention": {"None": 0.094873, "Closed_Fist": 0.094873, "Open_Palm": 0.17287, "Pointing_Up": 0.257892, "Thumb_Down": 0.094873, "Thumb_Up": 0.094873, "Victory": 0.094873, "ILoveYou": 0.094873},
-        "I want to show you something": {"None": 0.105713, "Closed_Fist": 0.105713, "Open_Palm": 0.105713, "Pointing_Up": 0.260011, "Thumb_Down": 0.105713, "Thumb_Up": 0.105713, "Victory": 0.105713, "ILoveYou": 0.105713},
-        "I need help": {"None": 0.125, "Closed_Fist": 0.125, "Open_Palm": 0.125, "Pointing_Up": 0.125, "Thumb_Down": 0.125, "Thumb_Up": 0.125, "Victory": 0.125, "ILoveYou": 0.125},
-        "Can you repeat that?": {"None": 0.125, "Closed_Fist": 0.125, "Open_Palm": 0.125, "Pointing_Up": 0.125, "Thumb_Down": 0.125, "Thumb_Up": 0.125, "Victory": 0.125, "ILoveYou": 0.125},
-        "I want something": {"None": 0.125, "Closed_Fist": 0.125, "Open_Palm": 0.125, "Pointing_Up": 0.125, "Thumb_Down": 0.125, "Thumb_Up": 0.125, "Victory": 0.125, "ILoveYou": 0.125},
-        "I need a break": {"None": 0.125, "Closed_Fist": 0.125, "Open_Palm": 0.125, "Pointing_Up": 0.125, "Thumb_Down": 0.125, "Thumb_Up": 0.125, "Victory": 0.125, "ILoveYou": 0.125}
-      }
+        "Yes / I agree": {
+          "None": 0.048867,
+          "Closed_Fist": 0.048867,
+          "Open_Palm": 0.048867,
+          "Pointing_Up": 0.048867,
+          "Thumb_Down": 0.048867,
+          "Thumb_Up": 0.657932,
+          "Victory": 0.048867,
+          "ILoveYou": 0.048867
+        },
+        "No / I disagree": {
+          "None": 0.048867,
+          "Closed_Fist": 0.048867,
+          "Open_Palm": 0.048867,
+          "Pointing_Up": 0.048867,
+          "Thumb_Down": 0.657932,
+          "Thumb_Up": 0.048867,
+          "Victory": 0.048867,
+          "ILoveYou": 0.048867
+        },
+        "Please pay attention": {
+          "None": 0.094873,
+          "Closed_Fist": 0.094873,
+          "Open_Palm": 0.17287,
+          "Pointing_Up": 0.257892,
+          "Thumb_Down": 0.094873,
+          "Thumb_Up": 0.094873,
+          "Victory": 0.094873,
+          "ILoveYou": 0.094873
+        },
+        "I want to show you something": {
+          "None": 0.105713,
+          "Closed_Fist": 0.105713,
+          "Open_Palm": 0.105713,
+          "Pointing_Up": 0.260011,
+          "Thumb_Down": 0.105713,
+          "Thumb_Up": 0.105713,
+          "Victory": 0.105713,
+          "ILoveYou": 0.105713
+        },
+        "I need help": {
+          "None": 0.125,
+          "Closed_Fist": 0.125,
+          "Open_Palm": 0.125,
+          "Pointing_Up": 0.125,
+          "Thumb_Down": 0.125,
+          "Thumb_Up": 0.125,
+          "Victory": 0.125,
+          "ILoveYou": 0.125
+        },
+        "Can you repeat that?": {
+          "None": 0.125,
+          "Closed_Fist": 0.125,
+          "Open_Palm": 0.125,
+          "Pointing_Up": 0.125,
+          "Thumb_Down": 0.125,
+          "Thumb_Up": 0.125,
+          "Victory": 0.125,
+          "ILoveYou": 0.125
+        },
+        "I want something": {
+          "None": 0.125,
+          "Closed_Fist": 0.125,
+          "Open_Palm": 0.125,
+          "Pointing_Up": 0.125,
+          "Thumb_Down": 0.125,
+          "Thumb_Up": 0.125,
+          "Victory": 0.125,
+          "ILoveYou": 0.125
+        },
+        "I need a break": {
+          "None": 0.125,
+          "Closed_Fist": 0.125,
+          "Open_Palm": 0.125,
+          "Pointing_Up": 0.125,
+          "Thumb_Down": 0.125,
+          "Thumb_Up": 0.125,
+          "Victory": 0.125,
+          "ILoveYou": 0.125
+        }
+      },
+      "weight": 1.0
     },
     "transcript": {
       "note": "Hand-coded placeholder, not learned: converted from the communication_live.py WORDS table. A keyword has weight 2.0 for its phrase and 0 otherwise; P(keyword | phrase) proportional to exp(weight), normalized per phrase over the keyword set. Each matched keyword in a fresh transcript is one hard observation.",
-      "labels": ["yes", "yeah", "no", "not", "help", "assist", "repeat", "again", "want", "need", "break", "tired", "look", "see"],
+      "labels": [
+        "yes",
+        "yeah",
+        "no",
+        "not",
+        "help",
+        "assist",
+        "repeat",
+        "again",
+        "want",
+        "need",
+        "break",
+        "tired",
+        "look",
+        "see"
+      ],
       "table": {
-        "Yes / I agree": {"yes": 0.275936, "yeah": 0.275936, "no": 0.037344, "not": 0.037344, "help": 0.037344, "assist": 0.037344, "repeat": 0.037344, "again": 0.037344, "want": 0.037344, "need": 0.037344, "break": 0.037344, "tired": 0.037344, "look": 0.037344, "see": 0.037344},
-        "No / I disagree": {"yes": 0.037344, "yeah": 0.037344, "no": 0.275936, "not": 0.275936, "help": 0.037344, "assist": 0.037344, "repeat": 0.037344, "again": 0.037344, "want": 0.037344, "need": 0.037344, "break": 0.037344, "tired": 0.037344, "look": 0.037344, "see": 0.037344},
-        "Please pay attention": {"yes": 0.071429, "yeah": 0.071429, "no": 0.071429, "not": 0.071429, "help": 0.071429, "assist": 0.071429, "repeat": 0.071429, "again": 0.071429, "want": 0.071429, "need": 0.071429, "break": 0.071429, "tired": 0.071429, "look": 0.071429, "see": 0.071429},
-        "I want to show you something": {"yes": 0.037344, "yeah": 0.037344, "no": 0.037344, "not": 0.037344, "help": 0.037344, "assist": 0.037344, "repeat": 0.037344, "again": 0.037344, "want": 0.037344, "need": 0.037344, "break": 0.037344, "tired": 0.037344, "look": 0.275936, "see": 0.275936},
-        "I need help": {"yes": 0.037344, "yeah": 0.037344, "no": 0.037344, "not": 0.037344, "help": 0.275936, "assist": 0.275936, "repeat": 0.037344, "again": 0.037344, "want": 0.037344, "need": 0.037344, "break": 0.037344, "tired": 0.037344, "look": 0.037344, "see": 0.037344},
-        "Can you repeat that?": {"yes": 0.037344, "yeah": 0.037344, "no": 0.037344, "not": 0.037344, "help": 0.037344, "assist": 0.037344, "repeat": 0.275936, "again": 0.275936, "want": 0.037344, "need": 0.037344, "break": 0.037344, "tired": 0.037344, "look": 0.037344, "see": 0.037344},
-        "I want something": {"yes": 0.037344, "yeah": 0.037344, "no": 0.037344, "not": 0.037344, "help": 0.037344, "assist": 0.037344, "repeat": 0.037344, "again": 0.037344, "want": 0.275936, "need": 0.275936, "break": 0.037344, "tired": 0.037344, "look": 0.037344, "see": 0.037344},
-        "I need a break": {"yes": 0.037344, "yeah": 0.037344, "no": 0.037344, "not": 0.037344, "help": 0.037344, "assist": 0.037344, "repeat": 0.037344, "again": 0.037344, "want": 0.037344, "need": 0.037344, "break": 0.275936, "tired": 0.275936, "look": 0.037344, "see": 0.037344}
-      }
+        "Yes / I agree": {
+          "yes": 0.275936,
+          "yeah": 0.275936,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.037344,
+          "see": 0.037344
+        },
+        "No / I disagree": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.275936,
+          "not": 0.275936,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.037344,
+          "see": 0.037344
+        },
+        "Please pay attention": {
+          "yes": 0.071429,
+          "yeah": 0.071429,
+          "no": 0.071429,
+          "not": 0.071429,
+          "help": 0.071429,
+          "assist": 0.071429,
+          "repeat": 0.071429,
+          "again": 0.071429,
+          "want": 0.071429,
+          "need": 0.071429,
+          "break": 0.071429,
+          "tired": 0.071429,
+          "look": 0.071429,
+          "see": 0.071429
+        },
+        "I want to show you something": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.275936,
+          "see": 0.275936
+        },
+        "I need help": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.275936,
+          "assist": 0.275936,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.037344,
+          "see": 0.037344
+        },
+        "Can you repeat that?": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.275936,
+          "again": 0.275936,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.037344,
+          "see": 0.037344
+        },
+        "I want something": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.275936,
+          "need": 0.275936,
+          "break": 0.037344,
+          "tired": 0.037344,
+          "look": 0.037344,
+          "see": 0.037344
+        },
+        "I need a break": {
+          "yes": 0.037344,
+          "yeah": 0.037344,
+          "no": 0.037344,
+          "not": 0.037344,
+          "help": 0.037344,
+          "assist": 0.037344,
+          "repeat": 0.037344,
+          "again": 0.037344,
+          "want": 0.037344,
+          "need": 0.037344,
+          "break": 0.275936,
+          "tired": 0.275936,
+          "look": 0.037344,
+          "see": 0.037344
+        }
+      },
+      "weight": 1.0
     },
     "envision": {
       "note": "[his call] Neutral placeholder: equal for every phrase, so this source does not move the posterior until a mapping is chosen.",
-      "labels": ["Gesture", "NoGesture"],
+      "labels": [
+        "Gesture",
+        "NoGesture"
+      ],
       "table": {
-        "Yes / I agree": {"Gesture": 0.5, "NoGesture": 0.5},
-        "No / I disagree": {"Gesture": 0.5, "NoGesture": 0.5},
-        "Please pay attention": {"Gesture": 0.5, "NoGesture": 0.5},
-        "I want to show you something": {"Gesture": 0.5, "NoGesture": 0.5},
-        "I need help": {"Gesture": 0.5, "NoGesture": 0.5},
-        "Can you repeat that?": {"Gesture": 0.5, "NoGesture": 0.5},
-        "I want something": {"Gesture": 0.5, "NoGesture": 0.5},
-        "I need a break": {"Gesture": 0.5, "NoGesture": 0.5}
-      }
+        "Yes / I agree": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "No / I disagree": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "Please pay attention": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "I want to show you something": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "I need help": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "Can you repeat that?": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "I want something": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        },
+        "I need a break": {
+          "Gesture": 0.5,
+          "NoGesture": 0.5
+        }
+      },
+      "weight": 1.0
     },
     "vocalization": {
-      "note": "[his call] — filled once classes and mapping are chosen",
+      "note": "[his call] \u2014 filled once classes and mapping are chosen",
       "labels": [],
-      "table": {}
+      "table": {},
+      "weight": 1.0
+    },
+    "head": {
+      "note": "[his call] Neutral until mapped. Head nod/shake from MediaPipe head pose (video.py HeadGesture). To map, raise P(label | intent) for the intent a label signals, e.g. nod for Yes, shake for No.",
+      "labels": [
+        "nod",
+        "shake",
+        "still"
+      ],
+      "weight": 1.0,
+      "table": {
+        "Yes / I agree": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "No / I disagree": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "Please pay attention": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "I want to show you something": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "I need help": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "Can you repeat that?": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "I want something": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        },
+        "I need a break": {
+          "nod": 0.333333,
+          "shake": 0.333333,
+          "still": 0.333333
+        }
+      }
+    },
+    "arm": {
+      "note": "[his call] Neutral until mapped. The user's raised-hand hold and wave from tracker wrist keypoints (video.py PersonTracker.arm_signals).",
+      "labels": [
+        "hold",
+        "wave",
+        "none"
+      ],
+      "weight": 1.0,
+      "table": {
+        "Yes / I agree": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "No / I disagree": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "Please pay attention": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "I want to show you something": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "I need help": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "Can you repeat that?": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "I want something": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        },
+        "I need a break": {
+          "hold": 0.333333,
+          "wave": 0.333333,
+          "none": 0.333333
+        }
+      }
     }
+  },
+  "filter": {
+    "note": "BeliefFilter: half-life of the drift back to the prior, and evidence strength per second.",
+    "half_life_s": 2.0,
+    "evidence_rate": 1.5
   }
 }
