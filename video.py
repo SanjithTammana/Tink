@@ -180,16 +180,20 @@ class HeadGesture:
                 'q': {'nod': round(nod, 3), 'shake': round(shake, 3), 'still': round(max(0.0, 1 - nod - shake), 3)}}
 
 
-def crop_box(frame, bbox, margin=0.15):
-    """Person box (x1, y1, x2, y2) grown by margin on each side, clipped to the frame."""
+def crop_region(frame, bbox, margin=0.15):
+    """(x1, y1, x2, y2) of the person box grown by margin on each side, clipped to the frame; None if tiny."""
     h, w = frame.shape[:2]
     x1, y1, x2, y2 = bbox
     mx, my = (x2 - x1) * margin, (y2 - y1) * margin
     x1, y1 = max(0, int(x1 - mx)), max(0, int(y1 - my))
     x2, y2 = min(w, int(x2 + mx)), min(h, int(y2 + my))
-    if x2 - x1 < 32 or y2 - y1 < 32:
-        return frame
-    return np.ascontiguousarray(frame[y1:y2, x1:x2])
+    return None if x2 - x1 < 32 or y2 - y1 < 32 else (x1, y1, x2, y2)
+
+
+def crop_box(frame, bbox, margin=0.15):
+    """Person box grown by margin on each side, clipped to the frame (the whole frame if the box is tiny)."""
+    r = crop_region(frame, bbox, margin)
+    return frame if r is None else np.ascontiguousarray(frame[r[1]:r[3], r[0]:r[2]])
 
 
 class PersonTracker:

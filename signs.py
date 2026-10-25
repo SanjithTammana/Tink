@@ -173,10 +173,10 @@ def load_meanings():
     return json.loads(CONFIG.read_text(encoding='utf-8'))
 
 
-def enroll(signs, takes, camera, user='default', seconds=1.5):
+def enroll(signs, takes, camera, user='default', seconds=2.0):
     """Guided recording: for each sign, a countdown, then `seconds` of capture, `takes` times."""
     import cv2
-    from video import GESTURE_URL, MODELS, PersonTracker, TargetSelector, crop_box, model_bytes
+    from video import GESTURE_URL, MODELS, PersonTracker, TargetSelector, crop_region, model_bytes
     import mediapipe as mp
     tracker, selector = PersonTracker(), TargetSelector()   # same person crop as the live app
     vision = mp.tasks.vision
@@ -187,23 +187,32 @@ def enroll(signs, takes, camera, user='default', seconds=1.5):
     if not cap.isOpened():
         raise RuntimeError('Cannot open camera')
     start, last_ts = time.monotonic(), -1
+    region, last_track = None, -1.0
 
     def grab():
-        nonlocal last_ts
+        nonlocal last_ts, region, last_track
         ok, frame = cap.read()
         if not ok:
             raise RuntimeError('camera read failed')
         ts = max(int((time.monotonic() - start) * 1000), last_ts + 1)
         last_ts = ts
-        people = tracker.update(frame, ts / 1000)
-        tid = selector.update(people)
-        user = next((p for p in people if p['id'] == tid), None)
-        crop = crop_box(frame, user['bbox']) if user else frame
+        if ts / 1000 - last_track >= 0.5:            # the person barely moves while enrolling: re-track at 2 Hz
+            people = tracker.update(frame, ts / 1000)
+            person = next((p for p in people if p['id'] == selector.update(people)), None)
+            region, last_track = (crop_region(frame, person['bbox']) if person else None), ts / 1000
+        x1, y1, x2, y2 = region or (0, 0, frame.shape[1], frame.shape[0])
+        crop = np.ascontiguousarray(frame[y1:y2, x1:x2])
         image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
         g = rec.recognize_for_video(image, ts)
         hands = [{'side': g.handedness[i][0].category_name if g.handedness[i] else 'Unknown',
                   'points': [[p.x, p.y] for p in h]} for i, h in enumerate(g.hand_landmarks)]
-        return cv2.flip(frame, 1), hands                 # features unmirrored (as live); the view mirrored
+        view = cv2.flip(frame, 1)                       # features unmirrored (as live); the view mirrored
+        W = frame.shape[1]
+        cv2.rectangle(view, (W - x2, y1), (W - x1, y2), (90, 230, 190), 1)
+        for h in hands:                                 # green dots: the hand landmarks being recorded
+            for px, py in h['points']:
+                cv2.circle(view, (int(W - (x1 + px * (x2 - x1))), int(y1 + py * (y2 - y1))), 3, (90, 220, 90), -1)
+        return view, hands
 
     def show(frame, lines, color=(90, 230, 190)):
         for i, text in enumerate(lines):
@@ -217,15 +226,22 @@ def enroll(signs, takes, camera, user='default', seconds=1.5):
             out_dir.mkdir(parents=True, exist_ok=True)
             k, skip = 0, False
             while k < takes and not skip:
-                t0 = time.monotonic()
-                while time.monotonic() - t0 < 2.0:               # countdown
-                    frame, _ = grab()
+                # start when the hands are up: at least 1 s to read the prompt, then hands visible for 3 frames in
+                # a row (a fixed countdown made the first takes of each sign miss the hands)
+                t0, streak = time.monotonic(), 0
+                while True:
+                    frame, hands = grab()
+                    streak = streak + 1 if hands else 0
+                    ready = time.monotonic() - t0 >= 1.0 and streak >= 3
                     key = show(frame, [f'Sign: {sign}   take {k + 1}/{takes}',
-                                       f'Get ready... {2 - int(time.monotonic() - t0)}', 'S = skip sign, Q = quit'])
+                                       'Starting...' if ready else 'Raise your hands to start',
+                                       'S = skip sign, Q = quit'])
                     if key == ord('q'):
                         raise KeyboardInterrupt
                     if key == ord('s'):
                         skip = True
+                        break
+                    if ready:
                         break
                 if skip:
                     break
@@ -238,10 +254,12 @@ def enroll(signs, takes, camera, user='default', seconds=1.5):
                     seen += present
                     show(frame, [f'Sign: {sign}   RECORDING', f'hands seen in {seen} frames'], (60, 60, 255))
                 if seen < 3:
-                    show(frame, ['No hands seen - again'], (60, 160, 255))
+                    print(f'{sign} take {k + 1}: hands in {seen}/{len(seq)} frames - not saved, again')
+                    show(frame, ['No hands seen - keep both hands in the box'], (60, 160, 255))
                     time.sleep(0.8)
                     continue
                 np.save(out_dir / f'take_{k}.npy', np.array(seq, np.float32))
+                print(f'{sign} take {k + 1}: hands in {seen}/{len(seq)} frames - saved')
                 k += 1
     except KeyboardInterrupt:
         pass
