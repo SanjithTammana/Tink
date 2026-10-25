@@ -36,6 +36,21 @@ class Transcriber:
             condition_on_previous_text=False)
         return ' '.join(s.text.strip() for s in segments).strip()
 
+    def transcribe_turns(self, wave_data, start_s=0, speaker_id=None):
+        """Segment timestamps are ASR estimates, not speaker diarization."""
+        self.load()
+        segments, info = self.model.transcribe(
+            wave_data, language='en', vad_filter=True, beam_size=5,
+            condition_on_previous_text=False)
+        return [{'turn_id': f'whisper:{start_s}:{i}', 'text': s.text.strip(),
+                 'start_s': float(start_s) + float(s.start),
+                 'end_s': float(start_s) + float(s.end),
+                 'speaker_id': speaker_id or 'unknown', 'speaker_role': 'unknown',
+                 'source': 'whisper', 'final': True, 'revision': 0,
+                 'timestamp_quality': 'asr_segment', 'overlap': False,
+                 'language': getattr(info, 'language', None)}
+                for i, s in enumerate(segments) if s.text.strip()]
+
 
 def wav_bytes(wave_data, sr=16000):
     """float32 mono -> 16-bit PCM WAV bytes."""
@@ -66,7 +81,7 @@ class MetaTranscriber:
             self.fallback.load()
         return self
 
-    def call(self, wave_data):
+    def _call_lines(self, wave_data):
         boundary = uuid.uuid4().hex
         settings = json.dumps({'model': META_ASR_MODEL, 'audioEncoding': 'WAV', 'mode': 'PUSH_TO_TALK'})
         body = b''.join([
@@ -80,9 +95,43 @@ class MetaTranscriber:
             'Content-Type': f'multipart/form-data; boundary={boundary}'})
         with urllib.request.urlopen(req, timeout=self.timeout_s) as r:
             lines = r.read().decode('utf-8').splitlines()
+        return lines
+
+    def call(self, wave_data):
+        lines = self._call_lines(wave_data)
         # text/plain: one turn per line; diarized lines look like 'A:Hello' or 'unknown:...'
         turns = [l.split(':', 1)[1] if ':' in l[:10] and l.split(':', 1)[0].isalnum() else l for l in lines]
         return ' '.join(t.strip() for t in turns if t.strip())
+
+    def transcribe_turns(self, wave_data, start_s=0, speaker_id=None):
+        """Retain chunk-local Meta speaker labels; do not imply cross-chunk identity."""
+        if self.key:
+            try:
+                lines = self._call_lines(wave_data)
+                result = []
+                for i, line in enumerate(lines):
+                    prefix, separator, content = line.partition(':')
+                    labeled = bool(separator and len(prefix) < 10 and prefix.isalnum())
+                    text = (content if labeled else line).strip()
+                    if not text:
+                        continue
+                    label = prefix if labeled else 'unknown'
+                    identity = (f'meta:{start_s}:{label}' if label.casefold() != 'unknown'
+                                else speaker_id or 'unknown')
+                    result.append({'turn_id': f'meta:{start_s}:{i}', 'text': text,
+                                   'start_s': float(start_s),
+                                   'end_s': float(start_s) + len(wave_data) / 16000.0,
+                                   'speaker_id': identity, 'speaker_label': label,
+                                   'speaker_scope': 'chunk', 'speaker_role': 'unknown',
+                                   'source': 'meta', 'final': True, 'revision': 0,
+                                   'timestamp_quality': 'window', 'language': None,
+                                   'overlap': False})
+                self.last_backend = 'meta'
+                return result
+            except Exception:
+                print('Muse Voice Transcribe failed; using local Whisper.')
+        self.last_backend = 'whisper'
+        return self.fallback.transcribe_turns(wave_data, start_s, speaker_id)
 
     def transcribe(self, wave_data):
         if self.key:
@@ -90,8 +139,8 @@ class MetaTranscriber:
                 text = self.call(wave_data)
                 self.last_backend = 'meta'
                 return text
-            except Exception as e:
-                print('Muse Voice Transcribe failed, using Whisper:', str(e)[:80])
+            except Exception:
+                print('Muse Voice Transcribe failed; using local Whisper.')
         self.last_backend = 'whisper'
         return self.fallback.transcribe(wave_data)
 

@@ -1,0 +1,237 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tink Design Identity Guide</title><style>
+@page { size: A4; margin: 20mm 19mm 20mm 19mm; @bottom-right {content:"tink.  /  design handoff  ·  " counter(page); font: 9px sans-serif; color:#7b8175;} }
+* { box-sizing: border-box; }
+body {font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 9.4pt; line-height:1.57; color:#23362a; background:white;}
+h1,h2,h3 { font-family: 'DejaVu Serif', Georgia, serif; font-weight: normal; color:#152920; break-after:avoid; }
+h1{font-size:29pt; letter-spacing:-.5px; line-height:1.15; padding-top:12mm; border-top:3px solid #b6a173; margin-top:0;margin-bottom:8mm}
+h2{font-size:17pt;margin:10mm 0 4mm;border-top:1px solid #d9dfd6;padding-top:4mm}
+h3{font-size:12pt;margin:7mm 0 3mm}
+p,li { orphans:3; widows:3; }
+p{margin:0 0 4mm}
+blockquote {background:#f3f0e8;border-left:3px solid #b89c66;padding:3mm 5mm;margin:5mm 0 7mm;font-style:italic;font-size:11.3pt;}
+blockquote p{margin:0}
+ul,ol{margin:3mm 0 5mm;padding-left:7mm}
+li{margin-bottom:1.7mm}
+strong{color:#173629}
+img{display:block;max-width:100%;max-height:118mm;object-fit:contain;margin:5mm auto 7mm;border:1px solid #d9dfd6;border-radius:3mm;}
+table{border-collapse:collapse;width:100%;font-size:8.5pt;margin:5mm 0 6mm;break-inside:avoid}
+th{background:#20382d;color:#f7f3e7;text-align:left;padding:2.5mm}
+td{border-bottom:1px solid #dee2dc;padding:2.2mm 2.5mm}
+pre{background:#eef1ed;color:#142e20;overflow-wrap:anywhere;white-space:pre-wrap;padding:3mm;font-size:7.5pt;border-radius:2mm}
+code{font-family:'DejaVu Sans Mono',monospace;font-size:.86em;color:#355741}
+pre code{color:#142e20}
+hr{border:0;border-top:1px solid #dfe3db}
+</style></head><body><h1>tink. — Design identity &amp; implementation handoff</h1>
+<p><strong>Status:</strong> HackTX design direction and working <em>visual prototype</em>, October 23, 2026<br />
+<strong>Working line:</strong> <em>Small signals. Big understanding.</em><br />
+<strong>Audience:</strong> design, frontend, interaction, accessibility, and demo teams</p>
+<blockquote>
+<p><strong>North star:</strong> Quiet magic. A premium, serene communication-assistance experience: carefully crafted like a luxury chocolate bar, not decorated like a fantasy game.</p>
+</blockquote>
+<h2>1. Executive decision</h2>
+<p>Keep the name <strong>tink.</strong> and the established landing-page/application layout. Make the <strong>Gilded Herbarium</strong> the primary identity, with <strong>Nocturne's</strong> exceptionally restrained luminous effects and <strong>Living Manuscript's</strong> paper-like composure. Light/dark appearances are siblings, not separate websites. Accessibility preferences alter rendering without altering the core structure or task sequence. There are <strong>no characters, fairies, silhouettes, wings as characters, or Tinker Bell depictions</strong> in the final UI.</p>
+<p>Tink's story connection is conceptual: small signals, delicate mechanisms, craftsmanship, illumination, and making subtle meaning visible. It should not resemble official Peter Pan/Disney branding, use a recognizable character silhouette, or depend on someone knowing the source material.</p>
+<p><strong>What must not happen:</strong> no forest photographs beneath body copy; no vines framing every card; no glowing outlines around every control; no hundreds of particles; no visual overload; no status conveyed by color alone; no claim that the interface can reliably read people's hidden intentions.</p>
+<p><img src="prototype/preview-dark.png" alt="Primary dark reference — HTML prototype" /></p>
+<h2>2. The brand in one sentence</h2>
+<p><strong>Tink makes complicated communication feel more approachable through calm, thoughtfully qualified interpretation.</strong> It is an assistive companion, not a mind-reading tool, clinical diagnostic device, or replacement for asking another person what they mean.</p>
+<h3>Brand attributes</h3>
+<ul>
+<li><strong>Precise:</strong> clear language, traceable observations, confidence calibrated to evidence.</li>
+<li><strong>Tender:</strong> reassuring without patronizing or infantilizing.</li>
+<li><strong>Crafted:</strong> meticulous spacing, typography, interactions, and color transitions.</li>
+<li><strong>Quietly mystical:</strong> little points of light and botanical linework, never spectacle.</li>
+<li><strong>Inclusive:</strong> multiple input methods and accessible outputs; no diagnosis required to change settings.</li>
+</ul>
+<p>Tone: short, warm, concrete, non-judgmental. Say “One possible reading…” rather than “They are definitely upset.” Avoid rigid emotion labels and diagnostic language. When uncertainty matters, show it visibly.</p>
+<h2>3. Three studies, one final identity</h2>
+<ol>
+<li><strong>Gilded Herbarium — primary.</strong> Matte forest backgrounds, fine botanical engraving, ivory, sage and warm muted gold. The strongest link to premium confectionery or perfume packaging.</li>
+<li><strong>Nocturne — selective inspiration.</strong> One delicate light path or softly illuminated point. Useful for analysis transitions; do <em>not</em> inherit a whole starfield or neon-blue interface.</li>
+<li><strong>Living Manuscript — structural inspiration.</strong> Spacious page composition and paper-like warmth; particularly useful for light mode and long-form explanations.</li>
+</ol>
+<p>The attached concept boards are <strong>exploration artifacts, not production specifications</strong>. Some contain busier treatments that have since been rejected. The <strong>interactive HTML prototype and its screenshots</strong> are the better reference for the restrained direction.</p>
+<p><img src="prototype/preview-light.png" alt="Light version, same layout" /></p>
+<h2>4. The recognizable signature</h2>
+<p>Create a single proprietary <strong>illuminated filament</strong> graphic: a fine line that can read as a plant stem, a thread of light, or a waveform. It is a metaphor for finding meaning in small signals.</p>
+<ul>
+<li>Brand use: one delicate filament in the hero artwork, terminating in one or two light points.</li>
+<li>Interaction use: its curve may respond <em>once</em> when a process successfully completes.</li>
+<li>Content use: convert it into a quiet waveform motif only when analysis is the active task.</li>
+<li>Reduced-motion use: identical, static silhouette with no lost information.</li>
+<li>Accessible use: purely decorative SVG should be hidden from screen readers; meaningful progress must have its own text.</li>
+</ul>
+<p>Do <strong>not</strong> use a winged character, a fairy icon in the wordmark, or hundreds of twinkling points. A wordmark <code>tink.</code> in a high-quality serif (e.g., Fraunces or another appropriately licensed face) plus a small abstract spark/stem is enough. Prefer a legible UI sans-serif (e.g., Inter) for all dense text and controls. Do not use script fonts for functional interface copy.</p>
+<h2>5. Visual rules and hierarchy</h2>
+<p><strong>Composition:</strong> editorial first. Large text, short sentences, strong horizontal alignment, intentional empty space. Premium equals restraint and exactness, not darkness by itself.</p>
+<p><strong>Visual budget</strong> (directional, not a measurement): around 90% calm background, typography, and functional surfaces; about 10% botanical/light detailing. <strong>One</strong> hero focal ornament per screen, never multiple competing focal points.</p>
+<p><strong>Decoration rules:</strong></p>
+<ul>
+<li>Only one botanical composition on a view, mostly on a page margin or far side of hero.</li>
+<li>At most approximately 3–6 static illumination points in the hero. Fewer in the app.</li>
+<li>In application views, illustrations should fade substantially or disappear; a single small motif can remain.</li>
+<li>Avoid gradients behind text, particle effects over interactive controls, strong drop shadows, and heavy glassmorphism.</li>
+<li>Use fine borders, matte surfaces, and subtle tonal elevation instead of floating stacks of cards.</li>
+<li>No imagery showing a fairy, personified pixie, silhouette, wings that read as an identifiable character, or Tinker Bell herself.</li>
+</ul>
+<p><strong>Spacing/type targets:</strong> 8px-based spacing scale; main desktop content width approximately 1120–1190px; generous hero padding; 16px body text default; body line-height 1.5–1.7; 12–16px typical card radii; comfortable touch targets. These are starting guidelines, not limits that should break responsive design.</p>
+<p><strong>Responsive:</strong> one layout and one content hierarchy across themes. On smaller screens the hero becomes stacked; ornamental art can shrink or be hidden. The primary CTA and critical text must remain usable on narrow viewports.</p>
+<h2>6. Color and theme architecture</h2>
+<p>Appearance is distinct from accessibility. A user's choices must compose cleanly:</p>
+<pre><code>Theme configuration
+├── appearance: system | light | dark
+├── contrast: standard | high
+├── color-vision palette: default | deuteranopia-friendly | protanopia-friendly | tritanopia-friendly
+├── sensory: standard | low-stimulation
+├── motion: system | reduced
+├── typography: default | large | extra-large
+└── comprehension: standard | simplified
+</code></pre>
+<p>The current prototype groups some accessibility combinations into one dropdown. That is useful for comparison but <strong>the production implementation should expose independent settings</strong>, with sensible conflict precedence (high contrast should override purely decorative accent choices). Presets for color-vision differences are <em>candidates</em> requiring testing with color-vision simulations and real people. Do not assert they are universally “safe.”</p>
+<h3>Starter design tokens</h3>
+<table>
+<thead>
+<tr>
+  <th>Token</th>
+  <th>Dark</th>
+  <th>Light</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>surface.base</code></td>
+  <td><code>#101E19</code></td>
+  <td><code>#F5F1E8</code></td>
+</tr>
+<tr>
+  <td><code>surface.raised</code></td>
+  <td><code>#1B2B23</code></td>
+  <td><code>#EBE9DF</code></td>
+</tr>
+<tr>
+  <td><code>text.primary</code></td>
+  <td><code>#EEEAE0</code></td>
+  <td><code>#21372A</code></td>
+</tr>
+<tr>
+  <td><code>text.secondary</code></td>
+  <td><code>#B9C4B9</code></td>
+  <td><code>#526254</code></td>
+</tr>
+<tr>
+  <td><code>accent.decorative</code></td>
+  <td><code>#D9BB83</code></td>
+  <td><code>#8B6B3A</code></td>
+</tr>
+<tr>
+  <td><code>action.fill</code></td>
+  <td><code>#DFC28B</code></td>
+  <td><code>#244330</code></td>
+</tr>
+<tr>
+  <td><code>action.text</code></td>
+  <td><code>#18241D</code></td>
+  <td><code>#FFFFFF</code></td>
+</tr>
+<tr>
+  <td><code>botanical.line</code></td>
+  <td><code>#93A78E</code></td>
+  <td><code>#6C7E66</code></td>
+</tr>
+</tbody>
+</table>
+<p>These values reflect the <strong>visual prototype</strong>, not an approved contrast audit. Verify actual color combinations programmatically; ensure color is never the sole status channel. Use tokens, not hex colors hardcoded into components.</p>
+<p><strong>High contrast:</strong> near-black/white base pairs; strong focus indicators; no background glow or textures; preserve meaning and layout. <strong>Low stimulation:</strong> restrained palette, static visuals, no decorative particle animation, but maintain readable text contrast. <strong>Color-vision modes:</strong> use accessible contrast plus shapes/text/icons for every semantic state. Status may be <code>Observed</code>, <code>Possible</code>, <code>Uncertain</code> with labels and distinct symbols; never green/orange/purple alone.</p>
+<h3>Example CSS organization</h3>
+<pre><code class="language-css">:root { --surface: #f5f1e8; --text: #21372a; --action: #244330; --action-text: #fff; }
+[data-appearance=&quot;dark&quot;] { --surface: #101e19; --text: #eeeae0; --action: #dfc28b; --action-text: #18241d; }
+[data-contrast=&quot;high&quot;][data-appearance=&quot;dark&quot;] { --surface: #000; --text: #fff; --action: #ffe36d; --action-text: #000; }
+.button-primary { background: var(--action); color: var(--action-text); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; } }
+</code></pre>
+<p>Persist explicit user preferences locally with consent-aware application storage; “system” should follow OS preferences. Avoid a flash of the wrong theme on first render. Make resets easy. No theme may reorder primary buttons, remove critical content, or change the route through the app.</p>
+<h2>7. Page-specific direction</h2>
+<h3>A. Marketing hero</h3>
+<p>Keep the existing split layout: wordmark/navigation, “Small signals. Big understanding.”, a two-line description, primary/secondary CTA, and <strong>one</strong> exquisite botanical filament illustration opposite the text. Below the fold: <strong>Listen / Consider / Connect</strong> as a sparse three-step row separated by hairlines—not large icon cards.</p>
+<p><strong>No:</strong> character renders, jungle backgrounds, dense flower borders, feature-card walls, particle overlays.</p>
+<h3>B. Input/analysis</h3>
+<p>One clear focal task: <em>Start with a conversation.</em> Let people enter text with no microphone or camera required. Later allow audio, video and live modes as optional, permissioned extensions. No automatic recording; clearly mark microphone/camera state and provide pause/stop.</p>
+<p>Sample mode must be obviously labeled as a demonstration. The provided HTML only implements a <strong>text example</strong> and a predetermined interpretation, <strong>not an AI model</strong>. It intentionally does not record, upload, or analyze actual audio/video.</p>
+<h3>C. Results</h3>
+<p>Use hierarchy: <strong>what is observed → possible interpretations → uncertainty / alternatives → useful response suggestion</strong>. Separate evidence from speculation. Example: “The speaker asked for more information” (observed); “They may be curious or requesting clarification” (possible); “Text alone does not confirm emotion” (limitation); “You could ask what they’d like to know” (action).</p>
+<p>Avoid “72% positive” unless a defensible model is actually calibrated, evaluated, and adequately explained. Prefer evidence-backed uncertainty to ornamental percentages. The results need text-first presentation that can be read aloud by assistive technology.</p>
+<h3>D. Preferences/accessibility</h3>
+<p>Place accessible theme controls in a persistent settings area, and a small appearance shortcut in the header. Organize into Appearance, Reading/Comprehension, Motion/Sensory, Input/Media, Language, and Privacy. Every option should be available without disclosing a disability.</p>
+<p><img src="prototype/preview-analysis.png" alt="Prototype's sample interaction view" /></p>
+<h2>8. Accessibility acceptance criteria</h2>
+<p>Target <strong>WCAG 2.2 AA</strong> as a development goal, <em>not</em> as an achieved certification. Verify at least:</p>
+<ul>
+<li>4.5:1 contrast for normal text and 3:1 for applicable large text and meaningful non-text elements.</li>
+<li>Keyboard-only use for all functionality; visible 3:1 focus indication against adjacent colors where applicable; no focus traps.</li>
+<li>Semantic HTML, correctly named controls, meaningful headings and landmarks, logical focus order; screen-reader testing (NVDA/VoiceOver).</li>
+<li>At least WCAG 2.2 AA minimum target sizing (24×24 CSS pixels or applicable exceptions); aim for larger primary actions.</li>
+<li>Reflow at narrow equivalent widths and up to 400% zoom; readable text at 200% resize without clipped controls.</li>
+<li>Respect reduced-motion settings; avoid flashing; no autoplay decorative motion; no essential information encoded in animation.</li>
+<li>Captions/transcripts for any actual audio/video functions, with permission controls and clear recording indicator.</li>
+<li>Color-independent semantic states, discernible controls and error recovery; descriptive, understandable labels.</li>
+<li>Low-stimulation and simplified presentation that do not omit required information.</li>
+<li>Testing with assistive technologies and users with diverse needs, not only automated audit tools.</li>
+</ul>
+<p>Recommended QA matrix: desktop light/dark, mobile light/dark, high contrast in each, each color-vision preset in each, low-stimulation, 200% text, 400% zoom, keyboard-only, NVDA or VoiceOver, and browser/system reduced-motion. Check all key screens, not just the landing page.</p>
+<h2>9. Interaction language and motion</h2>
+<p><strong>Motion rule:</strong> a visual cue must serve a purpose. 120–240ms hover/focus shifts are appropriate when they are nonessential; some users should see no movement. Add only a few fixed firefly-like lights in the hero and optionally one quiet light sweep on completed actions. Avoid looping sparkles in the analysis workspace.</p>
+<p><strong>Iconography:</strong> thin, consistent line icons. Neutral abstract spark or stem for brand; practical UI icons only when accompanied by labels in major navigation. Do not turn the cursor into a fairy or give the user an animated companion to manage.</p>
+<p><strong>Microcopy samples:</strong></p>
+<ul>
+<li>“Begin with a conversation.”</li>
+<li>“Here’s what can be observed.”</li>
+<li>“A few possible interpretations.”</li>
+<li>“What we can’t tell from this alone.”</li>
+<li>“One response you could try.”</li>
+<li>“No recording begins until you choose Start.”</li>
+</ul>
+<h2>10. Build order for HackTX</h2>
+<p><strong>Priority 0 — reliable demo story.</strong> Pick a defensible text-based scenario that works reliably in front of judges. Show the user selecting a preferred theme and receiving a cautious interpretation of observed text. Make the product purpose clear immediately.</p>
+<p><strong>Priority 1 — foundations.</strong> Component styles, semantic tokens, light/dark, responsive landing/input/results shell, well-labeled text input, keyboard navigation, consent boundaries.</p>
+<p><strong>Priority 2 — inclusion.</strong> High-contrast themes, reduced motion, text scale, caption/transcript path if media exists, color-independent semantic states, preferences persistence, screen-reader QA.</p>
+<p><strong>Priority 3 — core inference (if implemented).</strong> Input processing, evidence vs interpretation separation, alternatives, uncertainty, optional feedback. Consider fairness, generalization across expression styles/languages, privacy and consent; do not promise emotion-reading accuracy without testing.</p>
+<p><strong>Priority 4 — one signature flourish.</strong> Refine the illuminated filament as an SVG, then add just one subtle transition. Refuse ornamental scope creep until the product is functional and accessible.</p>
+<p><strong>Priority 5 — judge rehearsal.</strong> Show the same layout in dark, light, high contrast, and low-stimulation. Demonstrate text-only operation and control without color or animation. Explain user needs carefully without claiming to represent populations that were not studied.</p>
+<h3>Demo narrative (about 90 seconds)</h3>
+<ol>
+<li>“We built Tink to help people explore the ambiguity of communication, not guess hidden emotions.”</li>
+<li>Switch dark to light: same layout, no retraining or separate site.</li>
+<li>Switch high contrast or reduced motion, then navigate using the keyboard.</li>
+<li>Enter a safe sample sentence and show observation, alternatives, uncertainty and a suggested clarification.</li>
+<li>End: “Communication is nuanced. The UI should be accessible even before the model makes a suggestion.”</li>
+</ol>
+<h2>11. Prototype inventory and exact limitations</h2>
+<p><strong>Open:</strong> <code>prototype/index.html</code> in a modern browser. It is a single-file standalone concept; no build system or network connection is required.</p>
+<p>The prototype includes three identity buttons (Gilded Herbarium / Nocturne / Living Manuscript), dark/light, contrast/color-vision/low-stimulation <strong>visual presets</strong>, a reduce-motion control, 100%/112%/125% text scaling, a responsive layout, and a demo text interpretation. The visual presets are <em>not verified accessible palettes</em>; zoom, keyboard and screen-reader tests are still needed. No backend, microphone capture, camera capture, AI inference, deployed authentication, multilingual inference, or saved user profile is implemented.</p>
+<h3>Files</h3>
+<ul>
+<li><code>prototype/index.html</code> — source; open locally.</li>
+<li><code>prototype/preview-dark.png</code> — recommended primary visual benchmark.</li>
+<li><code>prototype/preview-light.png</code> — same structure in light mode.</li>
+<li><code>prototype/preview-nocturne.png</code> — lighting-direction comparison.</li>
+<li><code>prototype/preview-analysis.png</code> — actual text-demo interaction screen.</li>
+<li><code>prototype/preview-mobile.png</code> — responsive sample.</li>
+<li><code>reference-concepts/01-minimal-luxury-exploration.png</code> — later moodboard; not production specification.</li>
+<li><code>reference-concepts/02-theme-architecture-exploration.png</code> — later high-level theme explorations; ornamental density is not a target.</li>
+<li><code>reference-concepts/03-interface-exploration.png</code> — later UI concept visual; use as inspiration, not the current feature inventory.</li>
+</ul>
+<h2>12. Design review checklist — pass/fail</h2>
+<ul>
+<li>Can someone identify the primary task in three seconds?</li>
+<li>Does the page retain its hierarchy when all artwork, motion and color accents are removed?</li>
+<li>Are there fewer than two competing visual focal points?</li>
+<li>Is every magic detail intentional, not a repeated sticker?</li>
+<li>Is the content fully legible with font scaling and narrow reflow?</li>
+<li>Do semantic states remain understandable in grayscale and to screen readers?</li>
+<li>Does theme switching preserve exactly the same workflow?</li>
+<li>Are there zero recognizable fairy/Disney/Peter Pan character depictions?</li>
+<li>Do examples distinguish observable signals from interpretations and limitations?</li>
+<li>Is the demo truthful about which features actually work?</li>
+</ul>
+<p><strong>Final creative recommendation:</strong> Build the Gilded Herbarium system; adopt a single illuminated filament from Nocturne, and the generous editorial spacing of Living Manuscript. <em>Less fantasy illustration, more visual craftsmanship.</em></p>
+</body></html>

@@ -1,0 +1,42 @@
+.intro {
+  --intro-ink: #244330;
+  --intro-gold: #a78954;
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #f7f4eb;
+  color: var(--intro-ink);
+}
+.intro-skip {
+  position: absolute;
+  z-index: 2;
+  top: clamp(20px, 4vw, 48px);
+  right: clamp(20px, 5vw, 70px);
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #a6a18e;
+  background: transparent;
+  color: var(--intro-ink);
+  font: 500 .85rem/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+.intro-skip span { margin-left: 12px; color: var(--intro-gold); }
+.intro-skip:focus-visible { outline: 3px solid var(--intro-gold); outline-offset: 5px; }
+.intro-center { width: min(920px, 96vw); margin-top: -2vh; text-align: center; }
+.intro-mark { display: block; width: 100%; max-height: 48vh; overflow: visible; }
+.intro-ink-guide, .intro-ink { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.intro-ink-guide { stroke: var(--intro-ink); opacity: .09; }
+.intro-ink { stroke: var(--intro-ink); }
+.intro-i-ink { opacity: 0; }
+.intro-dust circle { fill: var(--intro-gold); }
+.intro-fairy-frame { pointer-events: none; }
+.intro-caption { margin: -3px 0 0; color: #536557; font: 400 clamp(.84rem, 1.5vw, 1rem)/1.5 system-ui, sans-serif; letter-spacing: .015em; }
+@media (max-width: 600px) {
+  .intro-center { width: 100vw; }
+  .intro-mark { max-height: 42vh; }
+  .intro-caption { margin-top: 4px; font-size: .8rem; }
+}

@@ -15,10 +15,60 @@ Then allow Camera and Microphone for your terminal or PyCharm in System Settings
 .\setup_windows.ps1
 ```
 
-Both scripts install `requirements.txt` and then `envisionhgdetector` with `--no-deps`. Tink loads only its
-LightGBM model, so TensorFlow is not needed. Model files download on first run.
+Both scripts install `requirements.txt` and then `envisionhgdetector` with `--no-deps`.
+The new session modes use NumPy/exported Envision models without requiring TensorFlow.
+After installation, follow [session model setup](docs/SESSION-SETUP.md) to prepare their local assets.
+The legacy `run.py` can download its own model files on first use; the new session modes require
+prepared local models and do not download them implicitly.
 
 ## Run
+
+### Django application
+
+The complete web application is Django-based. It serves Abhiram's supplied frontend and
+supervises the native camera/audio engine in a separate process. No additional frontend
+framework conversion is required.
+
+After environment and [model setup](docs/SESSION-SETUP.md), install Node.js once for building
+the supplied static assets. From this repository root:
+
+```powershell
+.\run.ps1
+```
+
+On macOS, use `bash run.sh`. The application runs at `http://127.0.0.1:8000`; it is a local
+desktop demonstration, not a public production deployment. Home records a clip and presents
+three confirmed-speech options; ASL provides the earlier alphabet reader. See
+[Django application details](Tink-web/README.md). `TINK_PYTHON` can select an existing backend
+environment. Local credentials, recordings, model weights, dependency folders and generated
+builds remain Git-ignored.
+
+### Recorded assessment with three Gemini options
+
+```powershell
+& .\.venv\Scripts\python.exe tink_session.py --assessment
+```
+
+In the existing OpenCV window: **SPACE** records audio/video, **ENTER** stops and assesses,
+**1-3** confirms/speaks an option, **R** retries, **P** opens the packet and **Q** quits.
+The backend also infers tentative partner/conversation context. This command opens the standalone
+OpenCV interface; use the Django application above for the complete web interface.
+See [recorded assessment](docs/RECORDED-ASSESSMENT.md) for capture, API and Django-callable seams.
+
+### Integrated learning lab (Windows, existing local models)
+
+```powershell
+& .\.venv\Scripts\python.exe tink_session.py --record
+```
+
+This test entry point combines automatic person recovery, visible face/body/hand features,
+anonymous audiovisual motifs, the previous ASL alphabet reader, timed conversation context,
+up to four possibilities and confirmation before local speech. It needs no word/sound enrollment.
+See [the layer-test guide](docs/SESSION-LAB.md) for controls and source-attribution limits.
+Gemini text suggestions require `--gemini`; raw-audio captions separately require `--gemini-asr`.
+Put the API key only in ignored `.env`, as described in [Gemini setup](docs/GEMINI-SETUP.md).
+The commands below remain the earlier app entry point.
+
 ```bash
 .venv/bin/python run.py --camera 0 --audio          # macOS
 .venv\Scripts\python.exe run.py --camera 0 --audio  # Windows

@@ -16,9 +16,10 @@ python3.11 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m pip install --no-deps envisionhgdetector==3.0.8
+.venv/bin/python -m pip install -r Tink-web/requirements.txt
 .venv/bin/python -c "import video, audio_text, retrieval, tts; print('Tink imports OK')"
 
 echo
 echo "Done. Grant Camera and Microphone access to your terminal (or PyCharm) in"
 echo "System Settings > Privacy & Security, then run:"
-echo "  .venv/bin/python run.py --camera 0 --audio"
+echo "  bash run.sh"
