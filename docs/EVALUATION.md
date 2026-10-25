@@ -72,6 +72,15 @@ Read: constrained to the frame, the LLM rephrases what Tink already knows. Retri
 to what people actually said. This is one model and one prompt, and the test has no scene referents (pointing
 or signs), where the LLM's echo-and-specify could matter more. It is not a general verdict on LLMs.
 
+### 4c. Candidate-pool ceiling (oracle recall, same 163 pairs)
+The pool is the composer's candidates plus the retrieved real replies (mean 33 sentences). Share of pairs with a
+sentence at cosine >= 0.7 to the real reply anywhere in the first K: K=3 0.12, K=10 0.26, K=20 0.27, K=50
+0.28. Here yes/no polarity gets no credit, unlike hit@3 in 4. By type at K=50: other 0.30 (top-3 today 0.23),
+I want something 0.13 (0.07), Attention 0.30 (0.20).
+Read: reranking the current pool can add only a few points; the bottleneck is candidate generation (what the
+pool contains). Next: widen the pool with more retrieval (k), many sampled LLM candidates (SpeakFaster-style),
+and user-supplied content (fingerspelled words, enrolled signs), then rescore.
+
 ## 5. Enrolled keyword signs (`signs.py check`, one user, one session)
 5 signs x 4 takes: leave-one-take-out 20/20. This is optimistic for live use (clean isolated takes); live
 spotting with movement between signs is not yet measured.
