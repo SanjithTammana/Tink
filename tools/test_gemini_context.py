@@ -234,16 +234,20 @@ class StructuredAsrTests(unittest.TestCase):
         self.assertTrue(turn['final'])
         self.assertEqual(asr.transcribe([0]), 'hello')
 
-    def test_meta_retains_chunk_scoped_speakers_without_inventing_precision(self):
-        asr = MetaTranscriber(api_key_env='TINK_OFFLINE_TEST_UNUSED_ENV')
+    def test_meta_retains_recording_scoped_speakers_and_estimated_turn_times(self):
+        asr = MetaTranscriber(api_key_env='TINK_OFFLINE_TEST_UNUSED_ENV', environ={})
         asr.key = 'offline'
-        asr._call_lines = lambda _: ['A:Hello', 'B:Hi', 'unknown:Uncertain']
+        asr._call_json = lambda _: {'audioDurationMs': 2000, 'transcript': 'Hello Hi Uncertain',
+            'turns': [{'turnId': i, 'transcript': text, 'speaker': label,
+                       'startMs': i * 500, 'endMs': (i+1) * 500}
+                      for i, (label, text) in enumerate([('A', 'Hello'), ('B', 'Hi'), ('unknown', 'Uncertain')])]}
         turns = asr.transcribe_turns([0] * 32000, 5)
         self.assertEqual([t['speaker_label'] for t in turns], ['A', 'B', 'unknown'])
         self.assertNotEqual(turns[0]['speaker_id'], turns[1]['speaker_id'])
-        self.assertEqual([(t['start_s'], t['end_s']) for t in turns], [(5, 7)] * 3)
-        self.assertTrue(all(t['timestamp_quality'] == 'window' for t in turns))
-        self.assertEqual(asr.call([0]), 'Hello Hi Uncertain')
+        self.assertEqual([(t['start_s'], t['end_s']) for t in turns], [(5, 5.5), (5.5, 6), (6, 6.5)])
+        self.assertTrue(all(t['timestamp_quality'] == 'asr_turn' for t in turns))
+        self.assertTrue(all(t['speaker_role'] == 'unknown' and t['speaker_uncertain'] for t in turns))
+        self.assertEqual(asr.call([0] * 32000), 'Hello Hi Uncertain')
 
 
 if __name__ == '__main__':
