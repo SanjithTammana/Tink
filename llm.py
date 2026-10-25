@@ -26,18 +26,34 @@ SYSTEM = (
     "Return JSON only: {\"options\": [{\"text\": \"...\", \"intent\": \"...\"}, ...]} with exactly 3 options, "
     "most likely first, each different in meaning or wording."
 )
+SYSTEM_SELECT = (
+    "You help an AAC user reply in a conversation. You get a frame of evidence about their intent and a "
+    "numbered list of candidate replies, many of them things real people said in similar conversations. Pick "
+    "the 3 candidates that best fit what the user most likely means, given the intent probabilities, the "
+    "partner's words and any referent or spelled word. You may lightly adapt a pick: fix pronouns or tense, "
+    "drop a clause that does not fit, or insert the referent or spelled word; never add other new facts, "
+    "names or preferences. Return JSON only: {\"options\": [{\"text\": \"...\", \"intent\": \"...\"}, ...]} "
+    "with exactly 3 options, most likely first."
+)
 SCHEMA = {'type': 'object', 'properties': {'options': {'type': 'array', 'minItems': 3, 'maxItems': 3, 'items': {
     'type': 'object', 'properties': {'text': {'type': 'string'}, 'intent': {'type': 'string'}},
     'required': ['text', 'intent']}}}, 'required': ['options']}
 
 
-def load_config(path=CONFIG):
+def load_config(path=CONFIG, profile=None, mode=None):
+    """The active (or named) profile, plus timeout and mode: 'select' (pick and lightly adapt real retrieved
+    replies) or 'compose' (write from the frame)."""
     cfg = json.loads(Path(path).read_text(encoding='utf-8'))
-    profile = cfg['profiles'][cfg['active']]
-    return {**profile, 'timeout_s': cfg.get('timeout_s', 4.0), 'name': cfg['active']}
+    name = profile or cfg['active']
+    return {**cfg['profiles'][name], 'timeout_s': cfg.get('timeout_s', 4.0), 'name': name,
+            'mode': mode or cfg.get('mode', 'select')}
 
 
-def frame_for(meaning, belief, partner_text, history, k_candidates=6):
+def system_prompt(cfg):
+    return SYSTEM_SELECT if cfg.get('mode') == 'select' else SYSTEM
+
+
+def frame_for(meaning, belief, partner_text, history, k_candidates=6, spelled=None, k_replies=8):
     """The compact frame sent to the model (no images, no raw signals, no personal data beyond the chat)."""
     refs = [(r, round(p, 2)) for r, p in (meaning.get('referents') or {}).items() if r != '(none)'][:2]
     return {
@@ -46,7 +62,10 @@ def frame_for(meaning, belief, partner_text, history, k_candidates=6):
         'partner_said': partner_text or None,
         'question_type': (meaning.get('context') or {}).get('type'),
         'history': [f"{'partner' if w == 'partner' else 'me'}: {t}" for w, t in history[-4:]],
-        'candidates': [c['text'] for c in (meaning.get('candidates') or [])[:k_candidates]],
+        'candidates': list(dict.fromkeys(
+            [c['text'] for c in (meaning.get('candidates') or [])[:k_candidates]]
+            + [r[0] for r in ((meaning.get('conversation') or {}).get('replies') or [])[:k_replies]])),
+        'spelled': spelled or None,
         'mixed_signals': (meaning.get('clarify') or {}).get('detail'),
     }
 
@@ -72,7 +91,7 @@ def call_anthropic(cfg, frame):
                                                'properties': {'text': {'type': 'string'}, 'intent': {'type': 'string'}}}}}}
     client = anthropic.Anthropic(timeout=cfg['timeout_s'], max_retries=0)
     response = client.messages.create(
-        model=cfg['model'], max_tokens=400, system=SYSTEM, thinking={'type': 'disabled'},
+        model=cfg['model'], max_tokens=400, system=system_prompt(cfg), thinking={'type': 'disabled'},
         messages=[{'role': 'user', 'content': json.dumps(frame, ensure_ascii=False)}],
         output_config={'format': {'type': 'json_schema', 'schema': schema}})
     if response.stop_reason == 'refusal':
@@ -86,7 +105,7 @@ def call(cfg, frame):
     if cfg.get('provider') == 'anthropic':
         return call_anthropic(cfg, frame)
     body = {'model': cfg['model'], 'temperature': 0.3, 'max_tokens': 220,
-            'messages': [{'role': 'system', 'content': SYSTEM},
+            'messages': [{'role': 'system', 'content': system_prompt(cfg)},
                          {'role': 'user', 'content': json.dumps(frame, ensure_ascii=False)}]}
     if cfg.get('json_schema', True):
         body['response_format'] = {'type': 'json_schema', 'json_schema': {'name': 'options', 'schema': SCHEMA}}

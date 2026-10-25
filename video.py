@@ -675,7 +675,7 @@ class ThreadedVideoAnalyzer:
     EMPTY_HANDS = {'timestamp_ms': 0, 'gestures': [], 'hand_motion': 'insufficient history'}
     EMPTY_FACE = {'face_movements': {}, 'head': {'status': 'starting', 'q': None}}
 
-    def __init__(self, analyzer, track=True, objects=True, tracker=None):
+    def __init__(self, analyzer, track=True, objects=True, tracker=None, letters=False):
         self.analyzer = analyzer
         # pass a TrackerProcess started early so its ~10 s model load overlaps the parent's own loading
         self.tracker = tracker or (TrackerProcess(use_objects=objects) if track else None)
@@ -683,6 +683,26 @@ class ThreadedVideoAnalyzer:
         self.mediapipe = LatestFrameWorker(self._hands, 'hands')
         self.face = LatestFrameWorker(self._face, 'face')   # own thread: nod/shake needs head pose at ~10+ fps
         self.envision = LatestFrameWorker(self._envision, 'envision') if analyzer.envision else None
+        # fingerspelling (asl.py): the A-Z classifier loads in the background (~40 s on first run)
+        self.reader, self.reader_status = None, 'off'
+        self.letters = LatestFrameWorker(self._letters, 'letters', min_interval=0.12) if letters else None
+        if letters:
+            self.reader_status = 'loading A-Z model'
+            threading.Thread(target=self._load_reader, daemon=True).start()
+
+    def _load_reader(self):
+        try:
+            from asl import FingerspellReader
+            self.reader, self.reader_status = FingerspellReader(), 'ok'
+        except Exception as e:
+            self.reader_status = 'error: ' + str(e)[:50]
+
+    def _letters(self, frame):
+        if self.reader is None:
+            return None
+        hands = (self.mediapipe.latest() or {}).get('hand_landmarks') or []
+        crop, _ = self.analyzer.target_crop(frame, self.tracked())
+        return self.reader.update(crop, hands)
 
     def tracked(self):
         out = (self.tracker.latest() if self.tracker else None) or {'people': [], 'objects': []}
@@ -708,6 +728,8 @@ class ThreadedVideoAnalyzer:
         self.face.submit(frame, ts_ms)
         if self.envision:
             self.envision.submit(frame)
+        if self.letters:
+            self.letters.submit(frame)
 
     def select_next(self):
         return self.selector.select_next(self.tracked()['people'])
@@ -719,13 +741,15 @@ class ThreadedVideoAnalyzer:
             result['envision'] = self.envision.latest() or {'status': 'starting', 'probs': None, 'label': None}
         else:
             result['envision'] = self.analyzer.envision_result(None)
+        if self.letters:
+            result['letters'] = (self.letters.latest() if self.reader else None) or {'status': self.reader_status}
         result['rates'] = {'tracker': self.tracker.fps() if self.tracker else 0.0,
                            'mediapipe': self.mediapipe.fps(), 'face': self.face.fps(),
                            'envision': self.envision.fps() if self.envision else 0.0}
         return result
 
     def close(self):
-        for worker in (self.mediapipe, self.face, self.envision):
+        for worker in (self.mediapipe, self.face, self.envision, self.letters):
             if worker:
                 worker.close()
         if self.tracker:

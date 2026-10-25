@@ -1,7 +1,8 @@
 """Tink live pipeline: video -> initial distribution, audio -> Bayesian update -> posterior over intents,
 semantic retrieval -> top interpretations, user confirmation -> text-to-speech.
 
-Keys: 1-3 confirm that interpretation and speak it, 0 reject all (logged), N switch user, Q quit.
+Keys: 1-3 confirm that interpretation and speak it, 0 reject all (logged), N switch user, Q quit;
+fingerspelling: A add the stable letter, SPACE, D delete, C clear, S speak the spelled text.
 Run: python run.py --camera 0 --audio
      python run.py --video sample.mp4 --no-audio [--threads on]   (on: play the file in real time like a camera)
 """
@@ -100,6 +101,13 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     user = next((p for p in visual.get('people', []) if p['id'] == target_id), None)
     if user and user.get('signals'):
         line(f"Arm: hold {user['signals']['hold']:.2f}  wave {user['signals']['wave']:.2f}")
+    lt = visual.get('letters')
+    if lt is not None:
+        if lt.get('n'):
+            line(f"Letter: {lt['best']} {lt['confidence']*100:.0f}%  {'STABLE - press A' if lt['ready'] else 'wait'}"
+                 f"   | spelled: {result.get('spelled') or '-'}", GREEN if lt['ready'] else WHITE)
+        else:
+            line(f"Letter: {lt.get('status', 'off')}   | spelled: {result.get('spelled') or '-'}")
     sg = visual.get('sign') or {}
     if sg.get('probs'):
         lead = sorted(sg['probs'].items(), key=lambda z: -z[1])[:2]
@@ -163,6 +171,7 @@ def main():
     parser.add_argument('--no-envision', action='store_true')
     parser.add_argument('--no-objects', action='store_true', help='no object detection (pointing targets)')
     parser.add_argument('--no-signs', action='store_true', help='ignore enrolled keyword signs')
+    parser.add_argument('--no-letters', action='store_true', help='no ASL fingerspelling (A-Z classifier)')
     parser.add_argument('--llm', action='store_true',
                         help='LLM composer for slot 1 (config/llm.json; cloud profiles send the frame off-device)')
     parser.add_argument('--user', default='default', help='whose enrolled signs to load (data/signs/<user>)')
@@ -221,7 +230,7 @@ def main():
     visual = VideoAnalyzer(use_tracker=not args.no_tracker and not threaded, use_envision=not args.no_envision,
                            use_objects=not args.no_objects and not threaded)
     worker = (ThreadedVideoAnalyzer(visual, track=not args.no_tracker, objects=not args.no_objects,
-                                    tracker=early_tracker) if threaded else None)
+                                    tracker=early_tracker, letters=not args.no_letters) if threaded else None)
     cap = cv2.VideoCapture(args.video if args.video else args.camera)
     if not cap.isOpened():
         (worker or visual).close()
@@ -233,9 +242,10 @@ def main():
     latest = None
     notice = None
     history, last_heard = [], None     # the conversation so far: ('partner' | 'you', text)
+    spelled = ''                       # fingerspelled text (A adds the stable letter, SPACE, D, C, S)
     last_hands_ts, sign = None, {'status': 'not enrolled' if spotter is None else 'starting', 'probs': None}
     shown = deque(maxlen=30)
-    print('Keys: 1-3 confirm + speak, 0 reject, N switch user, Q quit.')
+    print('Keys: 1-3 confirm + speak, 0 reject, N switch user, Q quit | spelling: A add, SPACE, D del, C clear, S speak')
     try:
         while True:
             ok, frame = cap.read()
@@ -268,13 +278,16 @@ def main():
                     spotter.reset()
                 belief_user = latest.get('target_id')
             result['belief'] = belief_filter.step(result['posterior'], ts / 1000)
+            result['spelled'] = spelled
             user = next((p for p in latest.get('people', []) if p['id'] == latest.get('target_id')), {})
             fresh = ap.get('timestamp') is not None and time.time() - ap['timestamp'] < 10
             result['meaning'] = composer.compose(
                 result['belief'], {'objects': latest.get('objects', []), 'pointing': user.get('pointing'),
+                                   'spelled': spelled,
                                    'referent_hints': {meanings['signs'][s]['referent']: p
                                                       for s, p in (sign.get('probs') or {}).items()
-                                                      if s != NO_SIGN and meanings['signs'].get(s, {}).get('referent')}},
+                                                      if s != NO_SIGN and meanings['signs'].get(s, {}).get('referent')}
+                                   | ({spelled.split()[-1].lower(): 1.0} if spelled.strip() else {})},
                 ap.get('transcript', '') if fresh else '', ts / 1000, k=args.top, conflicts=result['conflicts'])
             if fresh and ap.get('transcript') and ap['timestamp'] != last_heard:   # a new partner turn
                 history.append(('partner', ap['transcript']))
@@ -287,10 +300,10 @@ def main():
                 key = (partner_now, next(iter(m['intents']), None),
                        next((r for r in m['referents'] if r != NONE), None), bool(m.get('clarify')))
                 if not m.get('idle'):          # only compose when the user is communicating
-                    llm.request(frame_for(m, result['belief'], partner_now, history), key)
+                    llm.request(frame_for(m, result['belief'], partner_now, history, spelled=spelled), key + (spelled,))
                 lr = llm.latest()
                 result['llm'] = lr
-                if lr['status'] == 'ok' and lr['key'] == key and lr['options']:
+                if lr['status'] == 'ok' and lr['key'] == key + (spelled,) and lr['options']:
                     first = {'text': lr['options'][0]['text'], 'intent': lr['options'][0]['intent'],
                              'referent': NONE, 'score': top[0]['score'] if top else 0.0, 'llm': True}
                     top = [first] + [c for c in top if c['text'] != first['text']][:args.top - 1]
@@ -337,6 +350,25 @@ def main():
             elif key == ord('0'):
                 ranker.log(result['belief'], top, None)
                 notice = ('Rejected - use the board', time.monotonic())
+            elif key in (ord('a'), ord('A')):                   # fingerspelling: add the stable letter
+                lt = latest.get('letters') or {}
+                if lt.get('ready'):
+                    spelled += lt['best']
+                    worker.reader.stab.clear()            # a new stable prediction before the next letter
+                    notice = (f"Added {lt['best']}", time.monotonic())
+                else:
+                    notice = ('Letter not stable yet', time.monotonic())
+            elif key == 32:
+                spelled += ' '
+            elif key in (ord('d'), ord('D')):
+                spelled = spelled[:-1]
+            elif key in (ord('c'), ord('C')):
+                spelled = ''
+            elif key in (ord('s'), ord('S')) and spelled.strip():
+                speaker.say(spelled.strip())
+                history.append(('you', spelled.strip()))
+                notice = ('Spoke: ' + spelled.strip(), time.monotonic())
+                spelled = ''
             elif key in (ord('n'), ord('N')) and (worker or visual.tracker):
                 picked = worker.select_next() if worker else visual.tracker.select_next()
                 notice = (f'User is now #{picked}' if picked is not None else 'Nobody to select',

@@ -1,6 +1,7 @@
 {
   "note": "LLM composer backends; 'active' picks one (see docs/RESEARCH-llm.md). Local profiles keep conversation text on the device; cloud/API profiles send the frame (partner's words, intent, referent) to the provider. Keys come from the named environment variable (or `ant auth login` for Anthropic), never from this file.",
   "active": "ollama_cloud_gemma4",
+  "mode": "select",
   "timeout_s": 6.0,
   "profiles": {
     "mac_qwen35_4b": {"base_url": "http://localhost:11434/v1", "model": "qwen3.5:4b", "json_schema": true,
@@ -15,6 +16,9 @@
     "groq_gpt_oss_20b": {"base_url": "https://api.groq.com/openai/v1", "model": "openai/gpt-oss-20b",
                          "api_key_env": "GROQ_API_KEY", "json_schema": true,
                          "note": "free-tier fallback; check Groq data terms before sending real conversations"},
+    "gemini_flash_lite": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai", "model": "gemini-3.5-flash-lite",
+                          "api_key_env": "GEMINI_API_KEY", "json_schema": false,
+                          "note": "MLH 'Best Use of Gemini API' angle (confirm at HackTX). Free-tier prompts are used by Google to improve products: use a billing-linked key for real conversations. Latency unmeasured at our prompt size; see docs/RESEARCH-llm-sponsors.md"},
     "ollama_cloud_gemma4": {"base_url": "http://localhost:11434/v1", "model": "gemma4:cloud", "json_schema": false,
                             "note": "Ollama cloud via the local app (off-device; no structured outputs); used for the Windows evaluation"}
   }

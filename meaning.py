@@ -305,7 +305,13 @@ class MeaningComposer:
         z = sum(prior.values())
         prior = {r: v / z for r, v in prior.items()}
         pointing = scene.get('pointing') or {}
-        refs = self.referents.step(prior, self.pointing_loglik(pointing, objects, prior), t)
+        loglik = self.pointing_loglik(pointing, objects, prior)
+        # a referent the user named themselves (a signed WATER, a fingerspelled PIZZA) is evidence, not just a
+        # prior nudge: likelihood ratio 1 + 4w for it against 'no particular thing'
+        for r, w in (scene.get('referent_hints') or {}).items():
+            loglik[r] = loglik.get(r, 0.0) + math.log(1 + 4 * w)
+            loglik[NONE] = loglik.get(NONE, 0.0) - math.log(1 + 4 * w)
+        refs = self.referents.step(prior, loglik, t)
         pointed = pointing.get('score', 0.0) >= 0.3
         cands = {}
 
@@ -313,6 +319,9 @@ class MeaningComposer:
             if text and score > cands.get(text, {}).get('score', -1):
                 cands[text] = {'text': text, 'intent': intent, 'referent': ref, 'score': round(score, 4)}
 
+        spelled = ' '.join((scene.get('spelled') or '').split())
+        if spelled:   # what the user fingerspelled is their own words: offer it as typed, first
+            add(spelled[0].upper() + spelled[1:].lower() + ('' if spelled[-1] in '.?!' else '.'), 'other', NONE, 1.0)
         p_none = refs.get(NONE, 1.0)
         if conv:   # real replies from similar conversations: P(label | cues, context) x neighbour weight
             by_label = {}

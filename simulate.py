@@ -214,8 +214,8 @@ def cmd_dialogue(args):
     llm_cfg = None
     if args.llm:
         from llm import call, frame_for, load_config
-        llm_cfg = load_config()
-        names = names + (f"+ LLM ({llm_cfg['model']})", '+ LLM slot 1, retrieval 2-3')
+        llm_cfg = load_config(profile=args.profile, mode=args.mode)
+        names = names + (f"+ LLM {llm_cfg['mode']} ({llm_cfg['model']})", '+ LLM slot 1, retrieval 2-3')
         latencies, failures = [], 0
     for i in picked:
         partner, reply, label = str(z['ctx'][i]), str(z['reply'][i]), str(z['label'][i])
@@ -313,5 +313,7 @@ if __name__ == '__main__':
     d.add_argument('--seed', type=int, default=0)
     d.add_argument('--noise', choices=list(NOISE), default='medium')
     d.add_argument('--llm', action='store_true', help='also score the LLM composer (config/llm.json profile)')
+    d.add_argument('--profile', default=None, help='config/llm.json profile (default: active)')
+    d.add_argument('--mode', choices=['select', 'compose'], default=None)
     args = p.parse_args()
     {'simulate': cmd_simulate, 'coverage': cmd_coverage, 'dialogue': cmd_dialogue}[args.cmd](args)
