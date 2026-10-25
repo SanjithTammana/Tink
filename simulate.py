@@ -18,6 +18,7 @@ import copy
 import json
 import math
 import random
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -210,13 +211,34 @@ def cmd_dialogue(args):
         picked += rng.sample(idx, min(per, len(idx)))
     res = defaultdict(lambda: defaultdict(list))
     names = ('templates + phrase DB', '+ conversation model')
+    llm_cfg = None
+    if args.llm:
+        from llm import call, frame_for, load_config
+        llm_cfg = load_config()
+        names = names + (f"+ LLM ({llm_cfg['model']})", '+ LLM slot 1, retrieval 2-3')
+        latencies, failures = [], 0
     for i in picked:
         partner, reply, label = str(z['ctx'][i]), str(z['reply'][i]), str(z['label'][i])
         sc = {'intent': label if label in PRODUCE else '(no message)', 'referent': NONE, 'partner': partner,
               'objects': rng.sample(OBJECTS, 3)}
         sc['target'] = sc['objects'][0]
-        for name, comp in zip(names, (plain, with_conv)):
-            out = episode(random.Random(i), sc, args.noise, fusion, comp, True)
+        outs = {}
+        for name, comp in zip(names[:2], (plain, with_conv)):
+            outs[name] = episode(random.Random(i), sc, args.noise, fusion, comp, True)
+        if llm_cfg:
+            base = outs[names[1]]
+            t0 = time.monotonic()
+            try:
+                opts = call(llm_cfg, frame_for(base, {}, partner, [('partner', partner)]))
+                latencies.append(time.monotonic() - t0)
+            except Exception:
+                opts, failures = [], failures + 1
+            to_cand = lambda o: {'text': o['text'], 'referent': NONE,
+                                 'intent': next((x for x in intents if o['intent'][:3].lower() == x[:3].lower()), 'other')}
+            llm_c = [to_cand(o) for o in opts] or base['candidates']
+            outs[names[2]] = {'candidates': llm_c}
+            outs[names[3]] = {'candidates': llm_c[:1] + [c for c in base['candidates'] if c['text'] != llm_c[0]['text']][:2]}
+        for name, out in outs.items():
             cands = out['candidates']
             vec = conv.model.encode([reply] + [c['text'] for c in cands], normalize_embeddings=True,
                                     convert_to_numpy=True)
@@ -235,11 +257,14 @@ def cmd_dialogue(args):
     for name in names:
         r = res[name]
         print(f"| {name} | {np.mean(r['hit1']):.2f} | {np.mean(r['hit3']):.2f} | {np.mean(r['best']):.2f} |")
-    print('\nhit@3 by real reply type (templates + DB -> + conversation model):')
+    print('\nhit@3 by real reply type (' + ' -> '.join(names) + '):')
     for label in sorted(by_label):
-        a, b = res[names[0] + '|' + label]['hit3'], res[names[1] + '|' + label]['hit3']
-        if a:
-            print(f'  {label:30s} n={len(a):3d}  {np.mean(a):.2f} -> {np.mean(b):.2f}')
+        vals = [res[n + '|' + label]['hit3'] for n in names]
+        if vals[0]:
+            print(f'  {label:30s} n={len(vals[0]):3d}  ' + ' -> '.join(f'{np.mean(v):.2f}' for v in vals))
+    if llm_cfg and latencies:
+        print(f'\nLLM latency: median {np.median(latencies):.2f} s, p90 {np.percentile(latencies, 90):.2f} s, '
+              f'failures {failures}/{len(picked)}')
 
 
 def cmd_coverage(args):
@@ -287,5 +312,6 @@ if __name__ == '__main__':
     d.add_argument('--n', type=int, default=270)
     d.add_argument('--seed', type=int, default=0)
     d.add_argument('--noise', choices=list(NOISE), default='medium')
+    d.add_argument('--llm', action='store_true', help='also score the LLM composer (config/llm.json profile)')
     args = p.parse_args()
     {'simulate': cmd_simulate, 'coverage': cmd_coverage, 'dialogue': cmd_dialogue}[args.cmd](args)

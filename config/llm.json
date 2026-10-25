@@ -1,0 +1,21 @@
+{
+  "note": "LLM composer backends; 'active' picks one (see docs/RESEARCH-llm.md). Local profiles keep conversation text on the device; cloud/API profiles send the frame (partner's words, intent, referent) to the provider. Keys come from the named environment variable (or `ant auth login` for Anthropic), never from this file.",
+  "active": "ollama_cloud_gemma4",
+  "timeout_s": 6.0,
+  "profiles": {
+    "mac_qwen35_4b": {"base_url": "http://localhost:11434/v1", "model": "qwen3.5:4b", "json_schema": true,
+                      "extra": {"reasoning_effort": "none"},
+                      "note": "primary local (Mac): `ollama pull qwen3.5:4b`; Apache-2.0, IFEval 89.8 per its model card; ~1.7-2.1 s est. on M5 Air"},
+    "mac_gemma4_e2b": {"base_url": "http://localhost:11434/v1", "model": "gemma4:e2b", "json_schema": true,
+                       "note": "fast local fallback: `ollama pull gemma4:e2b`; ~1.3 s est. on M5 Air"},
+    "mac_gemma4_e4b": {"base_url": "http://localhost:11434/v1", "model": "gemma4:e4b", "json_schema": true,
+                       "note": "step up if e2b quality is short and latency allows; ~2.2 s est."},
+    "claude_haiku": {"provider": "anthropic", "model": "claude-haiku-5-5",
+                     "note": "primary API: official SDK, native JSON schema; $0.10/$0.50 per MTok; needs ANTHROPIC_API_KEY or `ant auth login`"},
+    "groq_gpt_oss_20b": {"base_url": "https://api.groq.com/openai/v1", "model": "openai/gpt-oss-20b",
+                         "api_key_env": "GROQ_API_KEY", "json_schema": true,
+                         "note": "free-tier fallback; check Groq data terms before sending real conversations"},
+    "ollama_cloud_gemma4": {"base_url": "http://localhost:11434/v1", "model": "gemma4:cloud", "json_schema": false,
+                            "note": "Ollama cloud via the local app (off-device; no structured outputs); used for the Windows evaluation"}
+  }
+}

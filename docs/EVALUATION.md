@@ -55,6 +55,19 @@ model's P(Yes)+P(No) is 0.36, vs 0.18 before other replies.
 | other (free-form) | 0.00 -> 0.23 |
 | I want something (specific requests) | 0.00 -> 0.07 |
 
+### 4b. With an LLM composer (`simulate.py dialogue --llm`, gemma4:cloud through Ollama, same 163 pairs)
+| suggestions from | hit@1 | hit@3 | mean best cosine |
+|---|---|---|---|
+| + conversation model (no LLM) | 0.36 | **0.48** | 0.35 |
+| + LLM (3 LLM options) | 0.29 | 0.42 | 0.26 |
+| + LLM slot 1, retrieval slots 2-3 | 0.29 | 0.45 | 0.34 |
+
+By type (hit@3, conversation model -> LLM): other 0.23 -> 0.13, I want something 0.07 -> 0.03, Attention
+0.20 -> 0.03, Yes/No unchanged at about 1.0. Latency median 2.52 s (p90 2.72 s), 0 failures in 163 calls.
+Read: constrained to the frame, the LLM rephrases what Tink already knows. Retrieved real replies sit closer
+to what people actually said. This is one model and one prompt, and the test has no scene referents (pointing
+or signs), where the LLM's echo-and-specify could matter more. It is not a general verdict on LLMs.
+
 ## 5. Enrolled keyword signs (`signs.py check`, one user, one session)
 5 signs x 4 takes: leave-one-take-out 20/20. This is optimistic for live use (clean isolated takes); live
 spotting with movement between signs is not yet measured.

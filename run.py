@@ -139,7 +139,11 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     if meaning.get('idle'):
         line('(no signal yet - suggestions are low confidence)', BLUE, 0.45)
     for i, t in enumerate(top, 1):
-        line(f"[{i}] {t['text']}  ({t['score']:.2f})", WHITE, 0.52, 24)
+        line(f"[{i}] {'*' if t.get('llm') else ''}{t['text']}  ({t['score']:.2f})", WHITE, 0.52, 24)
+    lr = result.get('llm')
+    if lr:
+        line(f"LLM: {lr['status']}" + (f"  {lr['latency_s']} s" if lr.get('latency_s') else '') + "   (* = LLM)",
+             BLUE, 0.45)
     y[0] += 4
     if notice and time.monotonic() - notice[1] < 4:
         line(notice[0], GREEN, 0.52)
@@ -159,6 +163,8 @@ def main():
     parser.add_argument('--no-envision', action='store_true')
     parser.add_argument('--no-objects', action='store_true', help='no object detection (pointing targets)')
     parser.add_argument('--no-signs', action='store_true', help='ignore enrolled keyword signs')
+    parser.add_argument('--llm', action='store_true',
+                        help='LLM composer for slot 1 (config/llm.json; cloud profiles send the frame off-device)')
     parser.add_argument('--user', default='default', help='whose enrolled signs to load (data/signs/<user>)')
     parser.add_argument('--no-conversation', action='store_true',
                         help='no dialogue-corpus context model (use the built-in question rules)')
@@ -202,6 +208,11 @@ def main():
         else:
             print('No conversation index: run `python conversation.py fetch` then `build` to enable it.')
     composer = MeaningComposer(ranker, conversation=conversation)
+    llm = None
+    if args.llm:
+        from llm import LLMComposer, frame_for
+        llm = LLMComposer()
+        print(f"LLM composer: {llm.cfg['model']} via {llm.cfg['base_url']}")
     speaker = Speaker(enabled=not args.no_tts)
     audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper)
     # Threaded: the display runs at camera rate; tracking and objects run in a child process, hands, face and
@@ -270,6 +281,19 @@ def main():
                 last_heard = ap['timestamp']
             result['history'] = history
             top = result['meaning']['candidates']
+            if llm:
+                m = result['meaning']
+                partner_now = ap.get('transcript', '') if fresh else ''
+                key = (partner_now, next(iter(m['intents']), None),
+                       next((r for r in m['referents'] if r != NONE), None), bool(m.get('clarify')))
+                if not m.get('idle'):          # only compose when the user is communicating
+                    llm.request(frame_for(m, result['belief'], partner_now, history), key)
+                lr = llm.latest()
+                result['llm'] = lr
+                if lr['status'] == 'ok' and lr['key'] == key and lr['options']:
+                    first = {'text': lr['options'][0]['text'], 'intent': lr['options'][0]['intent'],
+                             'referent': NONE, 'score': top[0]['score'] if top else 0.0, 'llm': True}
+                    top = [first] + [c for c in top if c['text'] != first['text']][:args.top - 1]
             shown.append(time.monotonic())
             display_fps = (len(shown) - 1) / max(shown[-1] - shown[0], 1e-6) if len(shown) > 1 else 0.0
             panel = draw_panel(frame, latest, ap, result, top, notice, display_fps)
