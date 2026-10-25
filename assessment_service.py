@@ -26,10 +26,18 @@ class ClipAssessmentService:
         (self.home / '.gitignore').write_text('*\n', encoding='utf-8')
         self.engine = SessionEngine(self.clock.session_id, MotifLearner(path=self.home / 'assessment-motifs.json'), speaker, self.root)
         self.visual, self.encoder, self.transcriber = None, None, None
+        self.asr_provider = 'local'
         self.warnings, self.recent_assessments = [], deque(maxlen=5)
 
     def prepare(self):
         self.visual = VisualSession(self.clock.session_id, self.home / 'person.json')
+        from transcribe import MetaTranscriptionError, meta_settings
+        try:
+            self.asr_provider = meta_settings(self.root)['TINK_TRANSCRIPTION_PROVIDER']
+            if self.asr_provider == 'meta':
+                self.warnings.append('Muse ASR enabled: recorded audio is sent to Meta on assessment; speaker labels are unverified and recording-local.')
+        except MetaTranscriptionError as exc:
+            self.warnings.append(str(exc) + ' Using local transcription.')
         try:
             self.encoder = Voc2VecEncoder()
         except (RuntimeError, OSError):
@@ -72,7 +80,8 @@ class ClipAssessmentService:
                 # Whisper estimate must remain within finalized clip boundaries.
                 turn['start_s'] = min(capture['end_s'], max(capture['start_s'], turn['start_s']))
                 turn['end_s'] = min(capture['end_s'], max(turn['start_s'], turn['end_s']))
-                self.engine.context.add_turn(turn)
+                if getattr(self, 'asr_provider', 'local') != 'meta':
+                    self.engine.context.add_turn(turn)
         audio_events = []
         if self.encoder is not None and capture['clock_valid']:
             segmenter = EnergySegmenter(noise_db=noise_db)
@@ -121,7 +130,12 @@ class ClipAssessmentService:
                 'prior_assessments_unconfirmed': list(self.recent_assessments)},
             'belief': self.engine.learner.posterior([e['event_id'] for e in events if e['ownership_valid']], capture['end_s']),
             'spelled': self.engine.spelled}
-        # Enforce the client's serialized byte limit, not an assumed per-frame size.
+        self._save_packet(clip, packet)
+        return packet
+
+    @staticmethod
+    def _save_packet(clip, packet):
+        # Enforce the client's serialized byte limit after local or optional cloud evidence.
         while len(json.dumps(packet, ensure_ascii=False, allow_nan=False).encode('utf-8')) > 240 * 1024:
             transmitted = packet['signals']['visual_observations']
             if len(transmitted) <= 2:
@@ -131,10 +145,49 @@ class ClipAssessmentService:
             packet['capture']['feature_sampling']['transmitted_observations'] = len(indices)
             packet['capture']['feature_sampling']['reason'] = 'bounded JSON size; complete measured features remain in features.json'
         (clip.folder / 'assessment-input.json').write_text(json.dumps(packet, indent=2, allow_nan=False), encoding='utf-8')
-        return packet
+
+    def _meta_transcript(self, clip, capture, packet):
+        """One opt-in request per recording, only inside explicit assessment, never packet()."""
+        if getattr(self, 'asr_provider', 'local') != 'meta':
+            return
+        conversation = packet['conversation']
+        if 'cloud_transcription' in conversation:
+            return  # Retrying Gemini must not repeatedly upload/bill the same audio.
+        from transcribe import MetaTranscriber, MetaTranscriptionError, META_ASR_MODEL
+        local = conversation.get('local_transcript', [])
+        selected = local
+        metadata = {'provider': 'meta_muse', 'model': META_ASR_MODEL, 'status': 'unavailable',
+            'speaker_identity': 'unverified labels scoped to this recording; roles remain unknown'}
+        conversation['cloud_transcription'] = metadata
+        try:
+            if capture.get('clock_valid') is not True:
+                raise MetaTranscriptionError('Muse transcription skipped: recording clock is uncertain.')
+            import soundfile as sf
+            wave, sr = sf.read(capture['audio_path'], dtype='float32')
+            if sr != SR or wave.ndim != 1:
+                raise MetaTranscriptionError('Muse transcription needs a 16 kHz mono recording.')
+            transcriber = MetaTranscriber(root=self.root, use_fallback=False)
+            selected = transcriber.transcribe_turns(wave, capture['start_s'])
+            conversation['cloud_transcript'] = selected
+            metadata['status'] = 'ok'
+            metadata['preferred_transcript'] = 'cloud_transcript'
+        except (MetaTranscriptionError, OSError, ValueError) as exc:
+            # Never expose arbitrary provider exceptions, audio paths, bodies or credentials.
+            message = str(exc) if isinstance(exc, MetaTranscriptionError) else 'Muse transcription could not read the recording.'
+            packet['capture'].setdefault('limitations', []).append(message + ' Local transcript and Gemini raw audio remain available.')
+            metadata['preferred_transcript'] = 'local_transcript'
+        if capture.get('clock_valid') is True:
+            for turn in selected:
+                if any(turn['start_s'] < end and turn['end_s'] > start
+                       for start, end in capture.get('audio_gaps', [])):
+                    turn['timestamp_quality'] = ('asr_turn' if metadata['status'] == 'ok' else 'asr_segment') + '_with_capture_gap'
+                if not turn.get('timestamp_quality', '').endswith('_with_capture_gap'):
+                    self.engine.context.add_turn(turn)
+        self._save_packet(clip, packet)
 
     def assess(self, clip, capture, packet=None, noise_db=None):
         packet = packet if packet is not None else self.packet(clip, capture, noise_db)
+        self._meta_transcript(clip, capture, packet)
         # Reload ignored .env on each explicit attempt; adding a key needs no restart.
         result = AssessmentClient(self.root).assess(packet, capture['video_path'], capture['audio_path'])
         (clip.folder / 'assessment.json').write_text(json.dumps(result, indent=2, allow_nan=False), encoding='utf-8')
