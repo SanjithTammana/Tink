@@ -23,13 +23,13 @@ LightGBM model, so TensorFlow is not needed. Model files download on first run.
 .venv/bin/python run.py --camera 0 --audio          # macOS
 .venv\Scripts\python.exe run.py --camera 0 --audio  # Windows
 ```
-Keys: **1–3** confirm an interpretation and speak it, **0** rejects all, **Q** quits. `--video file.mp4`
+Keys: **1–3** confirm an interpretation and speak it, **0** rejects all, **N** switches which person is the user, **Q** quits. `--video file.mp4`
 replaces the camera; `--headless --max-frames N` runs without a window.
 
 ## Layout
 | File | Role |
 |---|---|
-| `video.py` | EnvisionHGdetector LightGBM gesture probability, MediaPipe gestures and face, YOLO people |
+| `video.py` | person tracking (YOLO11n-pose + ByteTrack: boxes, IDs, wrist kinematics), Envision LightGBM gesture probability and MediaPipe gestures/face on the selected user |
 | `audio_text.py` | voc2vec vocalization classifier, mic pipeline, `BayesianFusion` |
 | `transcribe.py` | faster-whisper transcription |
 | `retrieval.py` | phrase database, MiniLM embeddings, phrase ranker |

@@ -1,4 +1,4 @@
-"""Video evidence for Tink: YOLO people, MediaPipe gestures + face blendshapes,
+"""Video evidence for Tink: tracked people (YOLO11n-pose + ByteTrack), MediaPipe gestures + face blendshapes,
 and EnvisionHGdetector's LightGBM Gesture/NoGesture score.
 
 Self-test: python video.py --video sample.mp4 [--frames N] [--no-yolo] [--no-envision]
@@ -108,13 +108,111 @@ class EnvisionGesture:
                 self.warned = True
             return {'status': f'error: {e}', **none}
 
+    def reset(self):
+        self.model.reset_buffer()
+        self.history.clear()
+
     def close(self):
         self.model.holistic.close()
         self.model.holistic = None  # its __del__ would close it a second time
 
 
+KP = {'nose': 0, 'l_shoulder': 5, 'r_shoulder': 6, 'l_elbow': 7, 'r_elbow': 8, 'l_wrist': 9, 'r_wrist': 10}
+
+
+def crop_box(frame, bbox, margin=0.15):
+    """Person box (x1, y1, x2, y2) grown by margin on each side, clipped to the frame."""
+    h, w = frame.shape[:2]
+    x1, y1, x2, y2 = bbox
+    mx, my = (x2 - x1) * margin, (y2 - y1) * margin
+    x1, y1 = max(0, int(x1 - mx)), max(0, int(y1 - my))
+    x2, y2 = min(w, int(x2 + mx)), min(h, int(y2 + my))
+    if x2 - x1 < 32 or y2 - y1 < 32:
+        return frame
+    return np.ascontiguousarray(frame[y1:y2, x1:x2])
+
+
+class PersonTracker:
+    """Every person: box, persistent ID (ByteTrack) and COCO body keypoints (YOLO11n-pose). One person is the
+    target (the user); only the target's crop goes to the single-person models (Envision, hands, face).
+
+    Hand kinematics per person, from keypoints: wrist speed in shoulder-widths per second over ~0.5 s (scale-free
+    across distance to camera) and whether each wrist is above its shoulder.
+    """
+
+    def __init__(self, model='yolo11n-pose.pt', imgsz=416, conf=0.4, history_s=0.6):
+        from ultralytics import YOLO
+        self.model = YOLO(model)
+        self.imgsz, self.conf, self.history_s = imgsz, conf, history_s
+        self.history = {}           # track id -> deque of (t, {'l_wrist': (x, y), 'r_wrist': ..., 'scale': sw})
+        self.target_id = None
+        self.manual = False         # True once the user picked a target; keep it while it is visible
+        self.people = []
+
+    def update(self, frame, t=None):
+        t = time.monotonic() if t is None else t
+        r = self.model.track(frame, persist=True, tracker='bytetrack.yaml', classes=[0], conf=self.conf,
+                             imgsz=self.imgsz, verbose=False)[0]
+        people = []
+        if r.boxes is not None and r.boxes.id is not None:
+            kps = r.keypoints.data.cpu().numpy() if r.keypoints is not None else None
+            for i, (box, tid, score) in enumerate(zip(r.boxes.xyxy.cpu().numpy(), r.boxes.id.cpu().numpy(),
+                                                      r.boxes.conf.cpu().numpy())):
+                person = {'id': int(tid), 'bbox': [int(v) for v in box], 'score': float(score)}
+                if kps is not None:
+                    person.update(self.kinematics(int(tid), kps[i], t))
+                people.append(person)
+        ids = {p['id'] for p in people}
+        for tid in list(self.history):
+            if tid not in ids and t - self.history[tid][-1][0] > 3.0:
+                del self.history[tid]
+        if self.target_id not in ids:
+            self.manual = False
+            area = lambda p: (p['bbox'][2] - p['bbox'][0]) * (p['bbox'][3] - p['bbox'][1])
+            self.target_id = max(people, key=area)['id'] if people else None
+        self.people = people
+        return people
+
+    def kinematics(self, tid, kp, t):
+        pt = lambda name: kp[KP[name]] if kp[KP[name]][2] > 0.3 else None   # (x, y, conf)
+        ls, rs = pt('l_shoulder'), pt('r_shoulder')
+        scale = float(np.hypot(*(ls[:2] - rs[:2]))) if ls is not None and rs is not None else None
+        out, now = {'hands': {}}, {}
+        for side, wrist, shoulder in (('left', 'l_wrist', ls), ('right', 'r_wrist', rs)):
+            w = pt(wrist)
+            if w is None:
+                continue
+            now[side] = w[:2]
+            out['hands'][side] = {'raised': bool(shoulder is not None and w[1] < shoulder[1]), 'speed': None}
+        hist = self.history.setdefault(tid, deque())
+        if scale and scale > 1:
+            hist.append((t, now, scale))
+        while hist and t - hist[0][0] > self.history_s:
+            hist.popleft()
+        if len(hist) >= 2:
+            (t0, first, s0), (t1, last, s1) = hist[0], hist[-1]
+            for side in out['hands']:
+                if side in first and side in last and t1 > t0:
+                    d = float(np.hypot(*(last[side] - first[side])))
+                    out['hands'][side]['speed'] = round(d / ((s0 + s1) / 2) / (t1 - t0), 2)
+        return out
+
+    def target(self):
+        return next((p for p in self.people if p['id'] == self.target_id), None)
+
+    def select_next(self):
+        """Cycle the target to the next visible person (left to right)."""
+        ordered = sorted(self.people, key=lambda p: p['bbox'][0])
+        if not ordered:
+            return None
+        ids = [p['id'] for p in ordered]
+        self.target_id = ids[(ids.index(self.target_id) + 1) % len(ids)] if self.target_id in ids else ids[0]
+        self.manual = True
+        return self.target_id
+
+
 class VideoAnalyzer:
-    def __init__(self, use_yolo=True, use_envision=True):
+    def __init__(self, use_tracker=True, use_envision=True):
         import mediapipe as mp
         self.mp = mp
         vision = mp.tasks.vision
@@ -128,10 +226,8 @@ class VideoAnalyzer:
                 base_options=opts(model_asset_buffer=model_bytes(FACE_URL, MODELS/'face_landmarker.task')),
                 running_mode=vision.RunningMode.VIDEO, num_faces=1,
                 output_face_blendshapes=True))
-        self.detector = None
-        if use_yolo:
-            from ultralytics import YOLO
-            self.detector = YOLO('yolo11n.pt')
+        self.tracker = PersonTracker() if use_tracker else None
+        self.tracker_warned = False
         self.envision = None
         self.envision_status = 'disabled'
         if use_envision:
@@ -140,23 +236,51 @@ class VideoAnalyzer:
             except Exception as e:
                 print('Envision init error:', e)
                 self.envision_status = f'error: {e}'
+        self.envision_person = None
+        self.observe_person = None
         self.prev_ts = -1
-        self.last_boxes = []
-        self.last_people_time = 0.0
         self.hand_history = deque(maxlen=12)
 
     def analyze(self, frame, ts_ms):
-        result = self.observe(frame, ts_ms)
-        result['envision'] = self.envision_result(frame)
+        tracked = self.track(frame, ts_ms)
+        crop, pid = self.target_crop(frame, tracked)
+        result = self.observe(crop, ts_ms, pid)
+        result['envision'] = self.envision_result(crop, pid)
+        result.update(tracked)
         return result
 
-    def envision_result(self, frame):
+    def track(self, frame, ts_ms=None):
+        """{'people': [{'id', 'bbox', 'score', 'hands'}], 'target_id'}; empty when the tracker is off."""
+        if not self.tracker:
+            return {'people': [], 'target_id': None}
+        try:
+            people = self.tracker.update(frame, None if ts_ms is None else ts_ms / 1000)
+        except Exception as e:
+            if not self.tracker_warned:
+                print('Tracker error:', e)
+                self.tracker_warned = True
+            people = self.tracker.people
+        return {'people': people, 'target_id': self.tracker.target_id}
+
+    @staticmethod
+    def target_crop(frame, tracked):
+        """The target person's crop and id, or the whole frame when nobody is tracked."""
+        target = next((p for p in tracked['people'] if p['id'] == tracked['target_id']), None)
+        return (crop_box(frame, target['bbox']), target['id']) if target else (frame, None)
+
+    def envision_result(self, frame, person_id=None):
         if self.envision:
+            if person_id != self.envision_person:   # another person: their motion window must not carry over
+                self.envision.reset()
+                self.envision_person = person_id
             return self.envision.analyze(frame)
         return {'status': self.envision_status, 'probs': None, 'label': None}
 
-    def observe(self, frame, ts_ms):
-        """Everything except Envision: YOLO people, MediaPipe gestures, face blendshapes, hand motion."""
+    def observe(self, frame, ts_ms, person_id=None):
+        """MediaPipe hand gestures, face blendshapes and hand motion on one person's crop (or the frame)."""
+        if person_id != self.observe_person:
+            self.hand_history.clear()
+            self.observe_person = person_id
         ts_ms = max(int(ts_ms), self.prev_ts + 1)
         self.prev_ts = ts_ms
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -182,18 +306,6 @@ class VideoAnalyzer:
             'mouthSmileLeft', 'mouthSmileRight', 'jawOpen',
             'browInnerUp', 'eyeBlinkLeft', 'eyeBlinkRight',
             'mouthFrownLeft', 'mouthFrownRight')}
-        now = time.monotonic()
-        if self.detector and now - self.last_people_time >= 0.45:
-            self.last_people_time = now
-            try:
-                prediction = self.detector.predict(frame, classes=[0], conf=0.4,
-                                                   verbose=False, imgsz=416)[0]
-                self.last_boxes = [
-                    {'bbox': [int(v) for v in b.xyxy[0].tolist()],
-                     'score': float(b.conf[0])}
-                    for b in prediction.boxes]
-            except Exception as e:
-                print('YOLO error:', e)
         hand_centers = []
         for hand in g.hand_landmarks:
             hand_centers.append((float(hand[0].x), float(hand[0].y)))
@@ -204,8 +316,7 @@ class VideoAnalyzer:
             if len(recent) >= 5:
                 displacement = sum(math.dist(a, b) for a, b in zip(recent, recent[1:]))
                 motion = 'hand moving' if displacement > 0.12 else 'hand relatively still'
-        return {'timestamp_ms': ts_ms, 'people': self.last_boxes,
-                'gestures': gestures, 'face_movements': observable,
+        return {'timestamp_ms': ts_ms, 'gestures': gestures, 'face_movements': observable,
                 'hand_motion': motion}
 
     def close(self):
@@ -272,37 +383,56 @@ class LatestFrameWorker:
 
 
 class ThreadedVideoAnalyzer:
-    """MediaPipe (+YOLO) and Envision each run in their own thread on the newest camera frame, so the display
-    loop runs at camera rate. Each part runs as fast as the CPU allows; Envision's rate is reported because its
-    velocity features were trained at 25-30 fps."""
+    """The person tracker, MediaPipe and Envision each run in their own thread on the newest camera frame, so
+    the display loop runs at camera rate. MediaPipe and Envision crop to the tracker's latest target box. Each
+    part runs as fast as the CPU allows; Envision's rate is reported because its velocity features were trained
+    at 25-30 fps."""
 
-    EMPTY = {'timestamp_ms': 0, 'people': [], 'gestures': [], 'face_movements': {},
-             'hand_motion': 'insufficient history'}
+    EMPTY = {'timestamp_ms': 0, 'gestures': [], 'face_movements': {}, 'hand_motion': 'insufficient history'}
 
     def __init__(self, analyzer):
         self.analyzer = analyzer
-        self.mediapipe = LatestFrameWorker(analyzer.observe, 'mediapipe')
-        self.envision = LatestFrameWorker(analyzer.envision_result, 'envision') if analyzer.envision else None
+        self.tracker = LatestFrameWorker(analyzer.track, 'tracker') if analyzer.tracker else None
+        self.mediapipe = LatestFrameWorker(self._observe, 'mediapipe')
+        self.envision = LatestFrameWorker(self._envision, 'envision') if analyzer.envision else None
+
+    def tracked(self):
+        out = dict((self.tracker.latest() if self.tracker else None) or {'people': [], 'target_id': None})
+        if self.analyzer.tracker:
+            out['target_id'] = self.analyzer.tracker.target_id   # live, so a manual switch shows at once
+        return out
+
+    def _observe(self, frame, ts_ms):
+        crop, pid = self.analyzer.target_crop(frame, self.tracked())
+        return self.analyzer.observe(crop, ts_ms, pid)
+
+    def _envision(self, frame):
+        crop, pid = self.analyzer.target_crop(frame, self.tracked())
+        return self.analyzer.envision_result(crop, pid)
 
     def submit(self, frame, ts_ms):
-        self.mediapipe.submit(frame, ts_ms)
-        if self.envision:
-            self.envision.submit(frame)
+        for worker in (self.tracker, self.mediapipe, self.envision):
+            if worker:
+                worker.submit(frame) if worker is self.envision else worker.submit(frame, ts_ms)
+
+    def select_next(self):
+        return self.analyzer.tracker.select_next() if self.analyzer.tracker else None
 
     def latest(self):
         result = dict(self.mediapipe.latest() or self.EMPTY)
+        result.update(self.tracked())
         if self.envision:
             result['envision'] = self.envision.latest() or {'status': 'starting', 'probs': None, 'label': None}
         else:
             result['envision'] = self.analyzer.envision_result(None)
-        result['rates'] = {'mediapipe': self.mediapipe.fps(),
-                           'envision': self.envision.fps() if self.envision else 0.0}
+        result['rates'] = {name: (w.fps() if w else 0.0) for name, w in
+                           (('tracker', self.tracker), ('mediapipe', self.mediapipe), ('envision', self.envision))}
         return result
 
     def close(self):
-        self.mediapipe.close()
-        if self.envision:
-            self.envision.close()
+        for worker in (self.tracker, self.mediapipe, self.envision):
+            if worker:
+                worker.close()
         self.analyzer.close()
 
 
@@ -320,13 +450,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--video', required=True)
     parser.add_argument('--frames', type=int, default=300)
-    parser.add_argument('--no-yolo', action='store_true')
+    parser.add_argument('--no-tracker', action='store_true')
     parser.add_argument('--no-envision', action='store_true')
     args = parser.parse_args()
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
         raise RuntimeError('Cannot open video')
-    analyzer = VideoAnalyzer(use_yolo=not args.no_yolo, use_envision=not args.no_envision)
+    analyzer = VideoAnalyzer(use_tracker=not args.no_tracker, use_envision=not args.no_envision)
     rows, total, n = [], 0.0, 0
     current = 0
     try:

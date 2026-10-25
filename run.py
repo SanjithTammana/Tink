@@ -1,7 +1,7 @@
 """Tink live pipeline: video -> initial distribution, audio -> Bayesian update -> posterior over intents,
 semantic retrieval -> top interpretations, user confirmation -> text-to-speech.
 
-Keys: 1-3 confirm that interpretation and speak it, 0 reject all (logged), Q quit.
+Keys: 1-3 confirm that interpretation and speak it, 0 reject all (logged), N switch user, Q quit.
 Run: python run.py --camera 0 --audio
      python run.py --video sample.mp4 --no-audio [--threads on]   (on: play the file in real time like a camera)
 """
@@ -37,11 +37,23 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     def header(msg):
         y[0] += 6
         line(msg, TEAL, 0.52)
-    for person in visual['people']:
+    target_id = visual.get('target_id')
+    for person in visual.get('people', []):
         a, b, c, d = person['bbox']
-        cv2.rectangle(canvas, (a, b), (c, d), (75, 220, 130), 2)
+        is_user = person['id'] == target_id
+        color = TEAL if is_user else (150, 150, 150)
+        cv2.rectangle(canvas, (a, b), (c, d), color, 3 if is_user else 1)
+        hands = person.get('hands', {})
+        # per hand: L/R, 'up' if the wrist is above its shoulder, wrist speed in shoulder-widths per second
+        tags = [f"{side[0].upper()}{' up' if h['raised'] else ''}"
+                + (f" {h['speed']:.1f}" if h.get('speed') is not None else '')
+                for side, h in sorted(hands.items())]
+        label = f"#{person['id']}{' USER' if is_user else ''}  " + '  '.join(tags)
+        cv2.putText(canvas, label, (a + 4, max(16, b - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
     line('TINK - LIVE COMMUNICATION EVIDENCE', TEAL, 0.6, 26)
-    line(f"People detected: {len(visual['people'])}")
+    people = visual.get('people', [])
+    user = f"user #{target_id} (N = switch)" if target_id is not None else 'no user selected'
+    line(f"People: {len(people)}   {user}")
     header('VIDEO EVIDENCE')
     for g in visual['gestures'][:2]:
         line(f"Hand: {g['label']} {g['score']*100:.0f}%")
@@ -55,7 +67,8 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     rates = visual.get('rates')
     if rates:
         # Envision's velocity features were trained at 25-30 fps; below ~20 fps its score is less reliable.
-        line(f"fps  display {display_fps:.0f} | mediapipe {rates['mediapipe']:.0f} | envision {rates['envision']:.0f}",
+        line(f"fps  display {display_fps:.0f} | track {rates['tracker']:.0f} | mediapipe {rates['mediapipe']:.0f}"
+             f" | envision {rates['envision']:.0f}",
              WHITE if rates['envision'] >= 20 or not env.get('probs') else BLUE)
     line('Motion: ' + visual['hand_motion'])
     face = sorted(visual['face_movements'].items(), key=lambda z: -z[1])[:2]
@@ -89,8 +102,9 @@ def main():
     parser.add_argument('--video', type=str, default=None)
     parser.add_argument('--audio', action='store_true', help='enable microphone + Whisper + voc2vec')
     parser.add_argument('--no-audio', action='store_true')
-    parser.add_argument('--yolo', action='store_true', help='YOLO person boxes (off by default: display only, slow)')
-    parser.add_argument('--no-yolo', action='store_true', help=argparse.SUPPRESS)  # old flag; YOLO is off by default
+    parser.add_argument('--no-tracker', action='store_true',
+                        help='no person tracking: single-person models see the whole frame')
+    parser.add_argument('--yolo', '--no-yolo', action='store_true', help=argparse.SUPPRESS)  # old flags, no-ops
     parser.add_argument('--no-envision', action='store_true')
     parser.add_argument('--threads', choices=['auto', 'on', 'off'], default='auto',
                         help='analysis in background threads (auto: on for camera, off for --video files)')
@@ -106,7 +120,7 @@ def main():
     ranker = PhraseRanker(PhraseDatabase(), fusion.phrases)
     speaker = Speaker(enabled=not args.no_tts)
     audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper)
-    visual = VideoAnalyzer(use_yolo=args.yolo and not args.no_yolo, use_envision=not args.no_envision)
+    visual = VideoAnalyzer(use_tracker=not args.no_tracker, use_envision=not args.no_envision)
     threaded = args.threads == 'on' or (args.threads == 'auto' and not args.video)
     # Threaded: the display runs at camera rate and analysis uses the newest frame when it is free.
     # Unthreaded (video files by default): every frame is analyzed in order, as fast as the CPU allows.
@@ -122,7 +136,7 @@ def main():
     latest = None
     notice = None
     shown = deque(maxlen=30)
-    print('Keys: 1-3 confirm + speak, 0 reject, Q quit.')
+    print('Keys: 1-3 confirm + speak, 0 reject, N switch user, Q quit.')
     try:
         while True:
             ok, frame = cap.read()
@@ -152,7 +166,9 @@ def main():
                 if frame_index % 25 == 0:
                     cv2.imwrite(str(ROOT / 'panel_snapshot.png'), panel)
                     rates = latest.get('rates') or {}
-                    print(f"frame {frame_index}: envision={latest['envision']['status']} "
+                    ppl = {p['id']: p.get('hands') for p in latest.get('people', [])}
+                    print(f"frame {frame_index}: people={len(ppl)} ids={list(ppl)} user={latest.get('target_id')} "
+                          f"hands={ppl.get(latest.get('target_id'))} envision={latest['envision']['status']} "
                           f"top={list(result['posterior'].items())[0]} say={top[0]['text']!r} "
                           f"fps display={display_fps:.1f} mediapipe={rates.get('mediapipe', 0):.1f} "
                           f"envision={rates.get('envision', 0):.1f}")
@@ -184,6 +200,10 @@ def main():
             elif key == ord('0'):
                 ranker.log(result['posterior'], top, None)
                 notice = ('Rejected - use the board', time.monotonic())
+            elif key in (ord('n'), ord('N')) and visual.tracker:
+                picked = worker.select_next() if worker else visual.tracker.select_next()
+                notice = (f'User is now #{picked}' if picked is not None else 'Nobody to select',
+                          time.monotonic())
     finally:
         cap.release()
         cv2.destroyAllWindows()
