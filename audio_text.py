@@ -21,7 +21,7 @@ from pathlib import Path
 import torch
 import numpy as np
 
-from transcribe import Transcriber
+from transcribe import MetaTranscriber, Transcriber
 
 ROOT = Path(__file__).resolve().parent
 MODELS = ROOT / 'models'
@@ -186,12 +186,13 @@ class AudioPipeline:
     """Background mic loop: Whisper transcript plus voc2vec vocalization class per 4 s chunk."""
 
     def __init__(self, enabled, whisper_size='base.en',
-                 voc_classifier_path='models/voc_clf.joblib', use_voc2vec=True):
+                 voc_classifier_path='models/voc_clf.joblib', use_voc2vec=True, asr='whisper'):
         self.enabled = enabled
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
         self.thread = None
-        self.transcriber = Transcriber(whisper_size)
+        # 'meta': Muse Voice Transcribe (sends partner audio to Meta; falls back to Whisper on failure)
+        self.transcriber = MetaTranscriber(whisper_size) if asr == 'meta' else Transcriber(whisper_size)
         self.encoder = None
         self.clf = None
         self.voc_error = None

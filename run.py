@@ -183,6 +183,8 @@ def main():
                         help='analysis in background threads (auto: on for camera, off for --video files)')
     parser.add_argument('--no-tts', action='store_true')
     parser.add_argument('--whisper', default='base.en')
+    parser.add_argument('--asr', choices=['whisper', 'meta'], default='whisper',
+                        help='meta: Muse Voice Transcribe (MODEL_API_KEY; partner audio goes to Meta; Whisper fallback)')
     parser.add_argument('--top', type=int, default=3)
     parser.add_argument('--save-every', type=float, default=1.0)
     parser.add_argument('--max-frames', type=int, default=0)
@@ -223,7 +225,7 @@ def main():
         llm = LLMComposer()
         print(f"LLM composer: {llm.cfg['model']} via {llm.cfg['base_url']}")
     speaker = Speaker(enabled=not args.no_tts)
-    audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper)
+    audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper, asr=args.asr)
     # Threaded: the display runs at camera rate; tracking and objects run in a child process, hands, face and
     # Envision in threads, each on the newest frame. Unthreaded (video files by default): every frame is
     # analyzed in order in this process, as fast as the CPU allows.
