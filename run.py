@@ -16,18 +16,19 @@ import cv2
 import numpy as np
 
 from audio_text import AudioPipeline, BayesianFusion
+from meaning import NONE, MeaningComposer
 from retrieval import PhraseDatabase, PhraseRanker
 from tts import Speaker
-from video import ThreadedVideoAnalyzer, VideoAnalyzer
+from video import ThreadedVideoAnalyzer, TrackerProcess, VideoAnalyzer
 
 ROOT = Path(__file__).resolve().parent
-TEAL, WHITE, BLUE, GREEN = (90, 230, 190), (235, 235, 235), (130, 180, 250), (90, 220, 90)
+TEAL, WHITE, BLUE, GREEN, ORANGE = (90, 230, 190), (235, 235, 235), (130, 180, 250), (90, 220, 90), (60, 160, 255)
 
 
 def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     h, w = frame.shape[:2]
     panel_w = 520
-    canvas = np.zeros((max(h, 760), w + panel_w, 3), dtype=np.uint8)
+    canvas = np.zeros((max(h, 820), w + panel_w, 3), dtype=np.uint8)
     canvas[:h, :w] = frame
     x = w + 14
     y = [26]
@@ -38,6 +39,16 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
         y[0] += 6
         line(msg, TEAL, 0.52)
     target_id = visual.get('target_id')
+    for o in visual.get('objects', []):
+        a, b, c, d = o['bbox']
+        cv2.rectangle(canvas, (a, b), (c, d), BLUE, 1)
+        cv2.putText(canvas, o['label'], (a + 3, b + 14), cv2.FONT_HERSHEY_SIMPLEX, 0.45, BLUE, 1, cv2.LINE_AA)
+    for person in visual.get('people', []):
+        pointing = person.get('pointing') or {}
+        if person['id'] == target_id and pointing.get('score', 0) >= 0.3:
+            o = np.array(pointing['origin'])
+            cv2.arrowedLine(canvas, tuple(o.astype(int)), tuple((o + 160 * np.array(pointing['dir'])).astype(int)),
+                            GREEN, 2, tipLength=0.15)
     for person in visual.get('people', []):
         a, b, c, d = person['bbox']
         is_user = person['id'] == target_id
@@ -54,6 +65,15 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     people = visual.get('people', [])
     user = f"user #{target_id} (N = switch)" if target_id is not None else 'no user selected'
     line(f"People: {len(people)}   {user}")
+    # channel health: which signals are actually arriving right now
+    usr = next((p for p in people if p['id'] == target_id), None)
+    ok = lambda b: 'ok' if b else '--'
+    voc_status = (audio.get('vocalization') or {}).get('status', '')
+    line(f"Channels  face {ok((visual.get('head') or {}).get('status') in ('ok', 'warming up'))}"
+         f" | hands {ok(bool(visual.get('gestures')))} | body {ok(bool(usr and usr.get('hands')))}"
+         f" | envision {ok((visual.get('envision') or {}).get('status') == 'ok')}"
+         f" | mic {ok(audio.get('status') not in (None, 'disabled') and 'error' not in str(audio.get('status')))}",
+         WHITE, 0.45, 20)
     header('VIDEO EVIDENCE')
     for g in visual['gestures'][:2]:
         line(f"Hand: {g['label']} {g['score']*100:.0f}%")
@@ -82,7 +102,11 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     face = sorted(visual['face_movements'].items(), key=lambda z: -z[1])[:2]
     line('Face (not emotion): ' + ', '.join(f'{k} {v*100:.0f}%' for k, v in face))
     header('AUDIO EVIDENCE')
-    line(f"Speech: {audio.get('transcript', '')[:44] or '(no recent transcript)'}")
+    history = result.get('history') or []
+    for who, text in history[-2:]:
+        line(f"{'Partner' if who == 'partner' else 'You'}: {text[:50]}", GREEN if who == 'you' else WHITE)
+    if not history:
+        line("Partner: (nothing heard yet)")
     voc = audio.get('vocalization') or {}
     if voc.get('status') == 'ok':
         line(f"Vocalization: {voc['label']} {voc['probs'][voc['label']]*100:.0f}%")
@@ -92,9 +116,21 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     (i0, p0), (q0, r0) = next(iter(result['initial_distribution'].items())), next(iter(result['posterior'].items()))
     line(f'Video {p0*100:4.1f}% {i0[:20]}  |  +Audio {r0*100:4.1f}% {q0[:20]}')
     header('BELIEF (builds while a signal is held)')
-    for intent, p in list(result['belief'].items())[:3]:
+    for intent, p in list(result['belief'].items())[:2]:
         line(f'{p*100:5.1f}%  {intent}')
+    meaning = result.get('meaning') or {}
+    refs = [(r, p) for r, p in (meaning.get('referents') or {}).items() if r != NONE][:2]
+    ctx = (meaning.get('context') or {}).get('type')
+    line('About: ' + (', '.join(f'{r} {p*100:.0f}%' for r, p in refs) or '-')
+         + (f'   | partner asked: {ctx}' if ctx else ''))
+    clarify = meaning.get('clarify')
+    if clarify:
+        line(clarify['prompt'][:64], ORANGE, 0.48)
+        if len(clarify['prompt']) > 64:
+            line(clarify['prompt'][64:128], ORANGE, 0.48)
     header('TOP INTERPRETATIONS - press 1-3, 0 = none')
+    if meaning.get('idle'):
+        line('(no signal yet - suggestions are low confidence)', BLUE, 0.45)
     for i, t in enumerate(top, 1):
         line(f"[{i}] {t['text']}  ({t['score']:.2f})", WHITE, 0.52, 24)
     y[0] += 4
@@ -114,6 +150,11 @@ def main():
                         help='no person tracking: single-person models see the whole frame')
     parser.add_argument('--yolo', '--no-yolo', action='store_true', help=argparse.SUPPRESS)  # old flags, no-ops
     parser.add_argument('--no-envision', action='store_true')
+    parser.add_argument('--no-objects', action='store_true', help='no object detection (pointing targets)')
+    parser.add_argument('--no-conversation', action='store_true',
+                        help='no dialogue-corpus context model (use the built-in question rules)')
+    parser.add_argument('--mapping', choices=['config', 'provisional'], default='config',
+                        help='provisional: overlay config/mapping_provisional.json (conventions, for testing)')
     parser.add_argument('--threads', choices=['auto', 'on', 'off'], default='auto',
                         help='analysis in background threads (auto: on for camera, off for --video files)')
     parser.add_argument('--no-tts', action='store_true')
@@ -124,17 +165,34 @@ def main():
     parser.add_argument('--headless', action='store_true', help='no window; save panel_snapshot.png')
     args = parser.parse_args()
 
+    threaded = args.threads == 'on' or (args.threads == 'auto' and not args.video)
+    # start the tracking process first: its model load overlaps everything loaded below
+    early_tracker = TrackerProcess(use_objects=not args.no_objects) if threaded and not args.no_tracker else None
     fusion = BayesianFusion.from_json()
+    if args.mapping == 'provisional':
+        prov = json.loads((ROOT / 'config' / 'mapping_provisional.json').read_text(encoding='utf-8'))
+        for src, spec in prov['sources'].items():
+            fusion.config['sources'][src].update({'labels': spec['labels'], 'table': spec['table']})
     belief_filter = fusion.make_filter()
     belief_user = None
     ranker = PhraseRanker(PhraseDatabase(), fusion.phrases)
+    conversation = None
+    if not args.no_conversation:
+        from conversation import INDEX, ConversationModel
+        if INDEX.exists():
+            conversation = ConversationModel([i for i in fusion.phrases if i != '(no message)'])
+        else:
+            print('No conversation index: run `python conversation.py fetch` then `build` to enable it.')
+    composer = MeaningComposer(ranker, conversation=conversation)
     speaker = Speaker(enabled=not args.no_tts)
     audio = AudioPipeline(enabled=args.audio and not args.no_audio, whisper_size=args.whisper)
-    visual = VideoAnalyzer(use_tracker=not args.no_tracker, use_envision=not args.no_envision)
-    threaded = args.threads == 'on' or (args.threads == 'auto' and not args.video)
-    # Threaded: the display runs at camera rate and analysis uses the newest frame when it is free.
-    # Unthreaded (video files by default): every frame is analyzed in order, as fast as the CPU allows.
-    worker = ThreadedVideoAnalyzer(visual) if threaded else None
+    # Threaded: the display runs at camera rate; tracking and objects run in a child process, hands, face and
+    # Envision in threads, each on the newest frame. Unthreaded (video files by default): every frame is
+    # analyzed in order in this process, as fast as the CPU allows.
+    visual = VideoAnalyzer(use_tracker=not args.no_tracker and not threaded, use_envision=not args.no_envision,
+                           use_objects=not args.no_objects and not threaded)
+    worker = (ThreadedVideoAnalyzer(visual, track=not args.no_tracker, objects=not args.no_objects,
+                                    tracker=early_tracker) if threaded else None)
     cap = cv2.VideoCapture(args.video if args.video else args.camera)
     if not cap.isOpened():
         (worker or visual).close()
@@ -145,6 +203,7 @@ def main():
     frame_index = 0
     latest = None
     notice = None
+    history, last_heard = [], None     # the conversation so far: ('partner' | 'you', text)
     shown = deque(maxlen=30)
     print('Keys: 1-3 confirm + speak, 0 reject, N switch user, Q quit.')
     try:
@@ -170,9 +229,19 @@ def main():
             result = fusion.infer(latest, ap)
             if latest.get('target_id') != belief_user:   # a different person: start their belief fresh
                 belief_filter.reset()
+                composer.referents.reset()
                 belief_user = latest.get('target_id')
             result['belief'] = belief_filter.step(result['posterior'], ts / 1000)
-            top = ranker.rank(result['belief'], k=args.top)
+            user = next((p for p in latest.get('people', []) if p['id'] == latest.get('target_id')), {})
+            fresh = ap.get('timestamp') is not None and time.time() - ap['timestamp'] < 10
+            result['meaning'] = composer.compose(
+                result['belief'], {'objects': latest.get('objects', []), 'pointing': user.get('pointing')},
+                ap.get('transcript', '') if fresh else '', ts / 1000, k=args.top, conflicts=result['conflicts'])
+            if fresh and ap.get('transcript') and ap['timestamp'] != last_heard:   # a new partner turn
+                history.append(('partner', ap['transcript']))
+                last_heard = ap['timestamp']
+            result['history'] = history
+            top = result['meaning']['candidates']
             shown.append(time.monotonic())
             display_fps = (len(shown) - 1) / max(shown[-1] - shown[0], 1e-6) if len(shown) > 1 else 0.0
             panel = draw_panel(frame, latest, ap, result, top, notice, display_fps)
@@ -185,7 +254,8 @@ def main():
                           f"hands={ppl.get(latest.get('target_id'))} envision={latest['envision']['status']} "
                           f"belief={list(result['belief'].items())[0]} say={top[0]['text']!r} "
                           f"fps display={display_fps:.1f} mediapipe={rates.get('mediapipe', 0):.1f} "
-                          f"envision={rates.get('envision', 0):.1f}")
+                          f"envision={rates.get('envision', 0):.1f} track={rates.get('tracker', 0):.1f} "
+                          f"objects={rates.get('objects', 0):.1f} face={rates.get('face', 0):.1f}")
                 if args.max_frames and frame_index >= args.max_frames:
                     break
                 continue
@@ -209,12 +279,13 @@ def main():
             if ord('1') <= key < ord('1') + len(top):
                 chosen = top[key - ord('1')]['text']
                 speaker.say(chosen)
+                history.append(('you', chosen))
                 ranker.log(result['belief'], top, chosen)
                 notice = ('Spoke: ' + chosen, time.monotonic())
             elif key == ord('0'):
                 ranker.log(result['belief'], top, None)
                 notice = ('Rejected - use the board', time.monotonic())
-            elif key in (ord('n'), ord('N')) and visual.tracker:
+            elif key in (ord('n'), ord('N')) and (worker or visual.tracker):
                 picked = worker.select_next() if worker else visual.tracker.select_next()
                 notice = (f'User is now #{picked}' if picked is not None else 'Nobody to select',
                           time.monotonic())

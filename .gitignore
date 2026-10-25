@@ -11,3 +11,4 @@ multimodal_packet.tmp
 *.pt
 *.joblib
 panel_snapshot.png
+data/dialogue/

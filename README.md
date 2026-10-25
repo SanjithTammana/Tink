@@ -23,6 +23,12 @@ LightGBM model, so TensorFlow is not needed. Model files download on first run.
 .venv/bin/python run.py --camera 0 --audio          # macOS
 .venv\Scripts\python.exe run.py --camera 0 --audio  # Windows
 ```
+Optional conversation model (dialogue corpora are downloaded, not committed: DailyDialog is CC BY-NC-SA 4.0):
+```bash
+python conversation.py fetch
+python conversation.py build
+```
+
 Keys: **1–3** confirm an interpretation and speak it, **0** rejects all, **N** switches which person is the user, **Q** quits. `--video file.mp4`
 replaces the camera; `--headless --max-frames N` runs without a window.
 
@@ -34,6 +40,9 @@ replaces the camera; `--headless --max-frames N` runs without a window.
 | `transcribe.py` | faster-whisper transcription |
 | `retrieval.py` | phrase database, MiniLM embeddings, phrase ranker |
 | `tts.py` | offline text-to-speech |
+| `meaning.py` | meaning layer: partner-question context, referents from pointing, mixed-signal clarify, sentence composer |
+| `conversation.py` | conversation model: embedded (partner turn -> reply) pairs give P(reply type \| partner) and real replies |
+| `simulate.py` | simulator and evaluations (synthetic signals, real held-out dialogues, AAC corpus coverage) |
 | `run.py` | live loop and panel |
 | `config/` | likelihood tables (placeholders) and the phrase database |
 | `docs/` | plan and research notes |

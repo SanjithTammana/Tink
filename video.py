@@ -22,6 +22,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent
 MODELS = ROOT / 'models'
+TORCH_THREADS = 2   # YOLO models run in separate threads; uncapped, each grabs every core and they starve
 MODELS.mkdir(exist_ok=True)
 GESTURE_URL = ('https://storage.googleapis.com/mediapipe-models/gesture_recognizer/'
                'gesture_recognizer/float16/1/gesture_recognizer.task')
@@ -206,9 +207,12 @@ class PersonTracker:
     HOLD_S, HOLD_SPEED = 1.0, 0.5
     WAVE_S, WAVE_STEP = 1.5, 0.15
 
-    def __init__(self, model='yolo11n-pose.pt', imgsz=416, conf=0.4, history_s=2.0):
+    def __init__(self, model='yolo11n-pose.pt', imgsz=320, conf=0.4, history_s=2.0):
+        import torch
         from ultralytics import YOLO
+        torch.set_num_threads(TORCH_THREADS)
         self.model = YOLO(model)
+        self.model.predict(np.zeros((imgsz, imgsz, 3), np.uint8), imgsz=imgsz, verbose=False)   # warm-up
         self.imgsz, self.conf, self.history_s = imgsz, conf, history_s
         self.history = {}           # track id -> deque of (t, {'l_wrist': (x, y), 'r_wrist': ..., 'scale': sw})
         self.target_id = None
@@ -270,7 +274,36 @@ class PersonTracker:
             hold, wave = self.arm_signals(pts, t)
             out['signals']['hold'] = max(out['signals']['hold'], hold)
             out['signals']['wave'] = max(out['signals']['wave'], wave)
+        out['pointing'] = self.pointing(pt, ls, rs, scale, out['hands'])
         return out
+
+    @staticmethod
+    def pointing(pt, ls, rs, scale, hands):
+        """The most point-like arm: origin (wrist, frame pixels), unit direction (elbow -> wrist) and a 0..1
+        score = straight arm * extended * not hanging down * steady. Each factor is a clipped ramp:
+          straight: cos(upper arm, forearm) from 0.3 to 0.8; extended: wrist-shoulder from 0.9 to 1.4 shoulder
+          widths; not down: forearm y-component from 0.8 down to 0.2 (image y points down); steady:
+          exp(-wrist speed / 1.0 shoulder widths per second)."""
+        ramp = lambda v, lo, hi: float(min(1.0, max(0.0, (v - lo) / (hi - lo))))
+        best = {'score': 0.0}
+        for side, shoulder, (wk, ek) in (('left', ls, ('l_wrist', 'l_elbow')), ('right', rs, ('r_wrist', 'r_elbow'))):
+            w, e = pt(wk), pt(ek)
+            if w is None or e is None:
+                continue
+            upper, fore = e[:2] - shoulder[:2], w[:2] - e[:2]
+            nu, nf = float(np.hypot(*upper)), float(np.hypot(*fore))
+            if nu < 1 or nf < 1:
+                continue
+            d = fore / nf
+            straight = ramp(float(upper @ fore) / (nu * nf), 0.3, 0.8)
+            extended = ramp(float(np.hypot(*(w[:2] - shoulder[:2]))) / scale, 0.9, 1.4)
+            not_down = ramp(-float(d[1]), -0.8, -0.2)
+            speed = hands.get(side, {}).get('speed') or 0.0
+            score = straight * extended * not_down * math.exp(-speed / 1.0)
+            if score > best['score']:
+                best = {'score': round(score, 3), 'side': side, 'origin': [float(w[0]), float(w[1])],
+                        'dir': [float(d[0]), float(d[1])]}
+        return best
 
     def arm_signals(self, pts, t):
         """(hold, wave) scores for one wrist from [(t, xy relative to shoulders, raised)]."""
@@ -299,8 +332,24 @@ class PersonTracker:
         return self.target_id
 
 
+class ObjectDetector:
+    """Everyday objects in the scene (YOLO11n, the 80 COCO classes, people excluded): pointing targets."""
+
+    def __init__(self, model='yolo11n.pt', imgsz=416, conf=0.35):
+        from ultralytics import YOLO
+        self.model = YOLO(model)
+        self.imgsz, self.conf = imgsz, conf
+        self.model.predict(np.zeros((imgsz, imgsz, 3), np.uint8), imgsz=imgsz, verbose=False)   # warm-up
+
+    def detect(self, frame):
+        r = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)[0]
+        return [{'label': self.model.names[int(c)], 'bbox': [int(v) for v in box], 'score': round(float(s), 3)}
+                for box, c, s in zip(r.boxes.xyxy.cpu().numpy(), r.boxes.cls.cpu().numpy(),
+                                     r.boxes.conf.cpu().numpy()) if int(c) != 0]
+
+
 class VideoAnalyzer:
-    def __init__(self, use_tracker=True, use_envision=True):
+    def __init__(self, use_tracker=True, use_envision=True, use_objects=True):
         import mediapipe as mp
         self.mp = mp
         vision = mp.tasks.vision
@@ -317,6 +366,8 @@ class VideoAnalyzer:
         self.head = HeadGesture()
         self.tracker = PersonTracker() if use_tracker else None
         self.tracker_warned = False
+        self.objects = ObjectDetector() if use_objects else None
+        self.objects_warned = False
         self.envision = None
         self.envision_status = 'disabled'
         if use_envision:
@@ -336,7 +387,19 @@ class VideoAnalyzer:
         result = self.observe(crop, ts_ms, pid)
         result['envision'] = self.envision_result(crop, pid)
         result.update(tracked)
+        result.update(self.detect_objects(frame))
         return result
+
+    def detect_objects(self, frame):
+        if not self.objects:
+            return {'objects': []}
+        try:
+            return {'objects': self.objects.detect(frame)}
+        except Exception as e:
+            if not self.objects_warned:
+                print('Object detector error:', e)
+                self.objects_warned = True
+            return {'objects': []}
 
     def observe(self, frame, ts_ms, person_id=None):
         """Hands and face together (the unthreaded path)."""
@@ -434,8 +497,9 @@ class LatestFrameWorker:
     """Runs fn on the newest submitted frame in a background thread; frames that arrive while it is busy are
     dropped, so the caller never waits on it."""
 
-    def __init__(self, fn, name):
+    def __init__(self, fn, name, min_interval=0.0):
         self.fn = fn
+        self.min_interval = min_interval   # seconds; for slow-changing things (objects in a room)
         self.cond = threading.Condition()
         self.pending = None
         self.result = None
@@ -458,6 +522,8 @@ class LatestFrameWorker:
                 if self.stopped:
                     return
                 args, self.pending = self.pending, None
+            if self.min_interval and self.done:
+                time.sleep(max(0.0, self.done[-1] + self.min_interval - time.monotonic()))
             try:
                 out = self.fn(*args)
             except Exception as e:
@@ -486,27 +552,132 @@ class LatestFrameWorker:
         self.thread.join(timeout=5)
 
 
+class TargetSelector:
+    """Which tracked person is the user: kept while visible, else the largest box; select_next cycles."""
+
+    def __init__(self):
+        self.target_id = None
+
+    def update(self, people):
+        if self.target_id not in {p['id'] for p in people}:
+            area = lambda p: (p['bbox'][2] - p['bbox'][0]) * (p['bbox'][3] - p['bbox'][1])
+            self.target_id = max(people, key=area)['id'] if people else None
+        return self.target_id
+
+    def select_next(self, people):
+        ordered = sorted(people, key=lambda p: p['bbox'][0])
+        if not ordered:
+            return None
+        ids = [p['id'] for p in ordered]
+        self.target_id = ids[(ids.index(self.target_id) + 1) % len(ids)] if self.target_id in ids else ids[0]
+        return self.target_id
+
+
+def _tracker_process(frames, results, use_objects):
+    """Child process: person tracking, plus objects every 2 s. Its own interpreter, so MediaPipe holding the
+    GIL in the parent's threads cannot starve it (alone it runs ~80 ms/frame; as a thread it got ~1.5 fps)."""
+    tracker = PersonTracker()
+    detector = ObjectDetector() if use_objects else None
+    objects, last_objects = [], 0.0
+    while True:
+        item = frames.get()
+        if item is None:
+            break
+        frame, ts_ms = item
+        try:
+            people = tracker.update(frame, ts_ms / 1000)
+            if detector and time.monotonic() - last_objects >= 2.0:
+                objects, last_objects = detector.detect(frame), time.monotonic()
+            results.put({'people': people, 'objects': objects})
+        except Exception as e:
+            results.put({'error': str(e)})
+
+
+class TrackerProcess:
+    """Parent side of _tracker_process. submit() never blocks (one-slot queue; a stale frame is replaced),
+    latest() is the newest {'people', 'objects'}, fps() the processing rate."""
+
+    def __init__(self, use_objects=True):
+        import multiprocessing as mp
+        ctx = mp.get_context('spawn')
+        self.frames, self.results = ctx.Queue(maxsize=1), ctx.Queue()
+        self.proc = ctx.Process(target=_tracker_process, args=(self.frames, self.results, use_objects),
+                                daemon=True)
+        self.proc.start()
+        self.result, self.done, self.warned = None, deque(maxlen=30), False
+        self.lock = threading.Lock()
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        while True:
+            try:
+                out = self.results.get()
+            except (EOFError, OSError):
+                return
+            if out is None:
+                return
+            if 'error' in out:
+                if not self.warned:
+                    print('Tracker process error:', out['error'])
+                    self.warned = True
+                continue
+            with self.lock:
+                self.result = out
+                self.done.append(time.monotonic())
+
+    def submit(self, frame, ts_ms):
+        import queue
+        try:
+            self.frames.get_nowait()
+        except queue.Empty:
+            pass
+        try:
+            self.frames.put_nowait((frame, ts_ms))
+        except queue.Full:
+            pass
+
+    def latest(self):
+        with self.lock:
+            return self.result
+
+    def fps(self):
+        with self.lock:
+            return (len(self.done) - 1) / max(self.done[-1] - self.done[0], 1e-6) if len(self.done) > 1 else 0.0
+
+    def close(self):
+        try:
+            self.frames.put_nowait(None)
+        except Exception:
+            pass
+        self.proc.join(timeout=3)
+        if self.proc.is_alive():
+            self.proc.terminate()
+        self.results.put(None)
+
+
 class ThreadedVideoAnalyzer:
-    """The person tracker, MediaPipe and Envision each run in their own thread on the newest camera frame, so
-    the display loop runs at camera rate. MediaPipe and Envision crop to the tracker's latest target box. Each
-    part runs as fast as the CPU allows; Envision's rate is reported because its velocity features were trained
-    at 25-30 fps."""
+    """Live analysis without blocking the display. Person tracking and object detection run in a separate
+    process (TrackerProcess); hands, face and Envision each run in their own thread on the newest frame,
+    cropped to the user's latest box. Each part runs as fast as the CPU allows; Envision's rate is reported
+    because its velocity features were trained at 25-30 fps. Build the VideoAnalyzer with use_tracker=False
+    and use_objects=False: tracking lives in the child process here."""
 
     EMPTY_HANDS = {'timestamp_ms': 0, 'gestures': [], 'hand_motion': 'insufficient history'}
     EMPTY_FACE = {'face_movements': {}, 'head': {'status': 'starting', 'q': None}}
 
-    def __init__(self, analyzer):
+    def __init__(self, analyzer, track=True, objects=True, tracker=None):
         self.analyzer = analyzer
-        self.tracker = LatestFrameWorker(analyzer.track, 'tracker') if analyzer.tracker else None
+        # pass a TrackerProcess started early so its ~10 s model load overlaps the parent's own loading
+        self.tracker = tracker or (TrackerProcess(use_objects=objects) if track else None)
+        self.selector = TargetSelector()
         self.mediapipe = LatestFrameWorker(self._hands, 'hands')
         self.face = LatestFrameWorker(self._face, 'face')   # own thread: nod/shake needs head pose at ~10+ fps
         self.envision = LatestFrameWorker(self._envision, 'envision') if analyzer.envision else None
 
     def tracked(self):
-        out = dict((self.tracker.latest() if self.tracker else None) or {'people': [], 'target_id': None})
-        if self.analyzer.tracker:
-            out['target_id'] = self.analyzer.tracker.target_id   # live, so a manual switch shows at once
-        return out
+        out = (self.tracker.latest() if self.tracker else None) or {'people': [], 'objects': []}
+        return {'people': out['people'], 'objects': out['objects'],
+                'target_id': self.selector.update(out['people'])}
 
     def _hands(self, frame, ts_ms):
         crop, pid = self.analyzer.target_crop(frame, self.tracked())
@@ -521,12 +692,15 @@ class ThreadedVideoAnalyzer:
         return self.analyzer.envision_result(crop, pid)
 
     def submit(self, frame, ts_ms):
-        for worker in (self.tracker, self.mediapipe, self.face, self.envision):
-            if worker:
-                worker.submit(frame) if worker is self.envision else worker.submit(frame, ts_ms)
+        if self.tracker:
+            self.tracker.submit(frame, ts_ms)
+        self.mediapipe.submit(frame, ts_ms)
+        self.face.submit(frame, ts_ms)
+        if self.envision:
+            self.envision.submit(frame)
 
     def select_next(self):
-        return self.analyzer.tracker.select_next() if self.analyzer.tracker else None
+        return self.selector.select_next(self.tracked()['people'])
 
     def latest(self):
         result = {**(self.mediapipe.latest() or self.EMPTY_HANDS), **(self.face.latest() or self.EMPTY_FACE)}
@@ -535,15 +709,17 @@ class ThreadedVideoAnalyzer:
             result['envision'] = self.envision.latest() or {'status': 'starting', 'probs': None, 'label': None}
         else:
             result['envision'] = self.analyzer.envision_result(None)
-        result['rates'] = {name: (w.fps() if w else 0.0) for name, w in
-                           (('tracker', self.tracker), ('mediapipe', self.mediapipe), ('face', self.face),
-                            ('envision', self.envision))}
+        result['rates'] = {'tracker': self.tracker.fps() if self.tracker else 0.0,
+                           'mediapipe': self.mediapipe.fps(), 'face': self.face.fps(),
+                           'envision': self.envision.fps() if self.envision else 0.0}
         return result
 
     def close(self):
-        for worker in (self.tracker, self.mediapipe, self.face, self.envision):
+        for worker in (self.mediapipe, self.face, self.envision):
             if worker:
                 worker.close()
+        if self.tracker:
+            self.tracker.close()
         self.analyzer.close()
 
 

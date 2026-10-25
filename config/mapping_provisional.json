@@ -1,0 +1,261 @@
+{
+  "note": "PROVISIONAL mapping for simulate.py only: common conventions (nod=yes, shake=no, wave=attention, raised hold=help, point=want/show, fist=break). Not Sanjith's mapping; the live app does not load it.",
+  "sources": {
+    "head": {
+      "labels": [
+        "nod",
+        "shake",
+        "still"
+      ],
+      "table": {
+        "Yes / I agree": {
+          "nod": 0.6,
+          "shake": 0.1,
+          "still": 0.3
+        },
+        "No / I disagree": {
+          "nod": 0.1,
+          "shake": 0.6,
+          "still": 0.3
+        },
+        "Please pay attention": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "I want to show you something": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "I need help": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "Can you repeat that?": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "I want something": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "I need a break": {
+          "nod": 0.2,
+          "shake": 0.2,
+          "still": 0.6
+        },
+        "(no message)": {
+          "nod": 0.125,
+          "shake": 0.125,
+          "still": 0.75
+        }
+      }
+    },
+    "arm": {
+      "labels": [
+        "hold",
+        "wave",
+        "none"
+      ],
+      "table": {
+        "Yes / I agree": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "No / I disagree": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "Please pay attention": {
+          "hold": 0.2,
+          "wave": 0.5,
+          "none": 0.3
+        },
+        "I want to show you something": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "I need help": {
+          "hold": 0.5,
+          "wave": 0.2,
+          "none": 0.3
+        },
+        "Can you repeat that?": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "I want something": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "I need a break": {
+          "hold": 0.2,
+          "wave": 0.2,
+          "none": 0.6
+        },
+        "(no message)": {
+          "hold": 0.125,
+          "wave": 0.125,
+          "none": 0.75
+        }
+      }
+    },
+    "point": {
+      "labels": [
+        "point",
+        "none"
+      ],
+      "table": {
+        "Yes / I agree": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "No / I disagree": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "Please pay attention": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "I want to show you something": {
+          "point": 0.6667,
+          "none": 0.3333
+        },
+        "I need help": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "Can you repeat that?": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "I want something": {
+          "point": 0.6667,
+          "none": 0.3333
+        },
+        "I need a break": {
+          "point": 0.3333,
+          "none": 0.6667
+        },
+        "(no message)": {
+          "point": 0.1429,
+          "none": 0.8571
+        }
+      }
+    },
+    "mp_gesture": {
+      "labels": [
+        "None",
+        "Closed_Fist",
+        "Open_Palm",
+        "Pointing_Up",
+        "Thumb_Down",
+        "Thumb_Up",
+        "Victory",
+        "ILoveYou"
+      ],
+      "table": {
+        "Yes / I agree": {
+          "None": 0.2667,
+          "Closed_Fist": 0.0667,
+          "Open_Palm": 0.0667,
+          "Pointing_Up": 0.0667,
+          "Thumb_Down": 0.0667,
+          "Thumb_Up": 0.3333,
+          "Victory": 0.0667,
+          "ILoveYou": 0.0667
+        },
+        "No / I disagree": {
+          "None": 0.2667,
+          "Closed_Fist": 0.0667,
+          "Open_Palm": 0.0667,
+          "Pointing_Up": 0.0667,
+          "Thumb_Down": 0.3333,
+          "Thumb_Up": 0.0667,
+          "Victory": 0.0667,
+          "ILoveYou": 0.0667
+        },
+        "Please pay attention": {
+          "None": 0.3333,
+          "Closed_Fist": 0.0833,
+          "Open_Palm": 0.1667,
+          "Pointing_Up": 0.0833,
+          "Thumb_Down": 0.0833,
+          "Thumb_Up": 0.0833,
+          "Victory": 0.0833,
+          "ILoveYou": 0.0833
+        },
+        "I want to show you something": {
+          "None": 0.3333,
+          "Closed_Fist": 0.0833,
+          "Open_Palm": 0.0833,
+          "Pointing_Up": 0.1667,
+          "Thumb_Down": 0.0833,
+          "Thumb_Up": 0.0833,
+          "Victory": 0.0833,
+          "ILoveYou": 0.0833
+        },
+        "I need help": {
+          "None": 0.3636,
+          "Closed_Fist": 0.0909,
+          "Open_Palm": 0.0909,
+          "Pointing_Up": 0.0909,
+          "Thumb_Down": 0.0909,
+          "Thumb_Up": 0.0909,
+          "Victory": 0.0909,
+          "ILoveYou": 0.0909
+        },
+        "Can you repeat that?": {
+          "None": 0.3636,
+          "Closed_Fist": 0.0909,
+          "Open_Palm": 0.0909,
+          "Pointing_Up": 0.0909,
+          "Thumb_Down": 0.0909,
+          "Thumb_Up": 0.0909,
+          "Victory": 0.0909,
+          "ILoveYou": 0.0909
+        },
+        "I want something": {
+          "None": 0.3636,
+          "Closed_Fist": 0.0909,
+          "Open_Palm": 0.0909,
+          "Pointing_Up": 0.0909,
+          "Thumb_Down": 0.0909,
+          "Thumb_Up": 0.0909,
+          "Victory": 0.0909,
+          "ILoveYou": 0.0909
+        },
+        "I need a break": {
+          "None": 0.2857,
+          "Closed_Fist": 0.2857,
+          "Open_Palm": 0.0714,
+          "Pointing_Up": 0.0714,
+          "Thumb_Down": 0.0714,
+          "Thumb_Up": 0.0714,
+          "Victory": 0.0714,
+          "ILoveYou": 0.0714
+        },
+        "(no message)": {
+          "None": 0.4615,
+          "Closed_Fist": 0.0769,
+          "Open_Palm": 0.0769,
+          "Pointing_Up": 0.0769,
+          "Thumb_Down": 0.0769,
+          "Thumb_Up": 0.0769,
+          "Victory": 0.0769,
+          "ILoveYou": 0.0769
+        }
+      }
+    }
+  }
+}

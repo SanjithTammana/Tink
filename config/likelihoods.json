@@ -7,7 +7,8 @@
     "I need help",
     "Can you repeat that?",
     "I want something",
-    "I need a break"
+    "I need a break",
+    "(no message)"
   ],
   "prior": "uniform",
   "sources": {
@@ -103,6 +104,16 @@
           "Thumb_Up": 0.125,
           "Victory": 0.125,
           "ILoveYou": 0.125
+        },
+        "(no message)": {
+          "None": 0.363636,
+          "Closed_Fist": 0.090909,
+          "Open_Palm": 0.090909,
+          "Pointing_Up": 0.090909,
+          "Thumb_Down": 0.090909,
+          "Thumb_Up": 0.090909,
+          "Victory": 0.090909,
+          "ILoveYou": 0.090909
         }
       },
       "weight": 1.0
@@ -253,6 +264,22 @@
           "tired": 0.275936,
           "look": 0.037344,
           "see": 0.037344
+        },
+        "(no message)": {
+          "yes": 0.071429,
+          "yeah": 0.071429,
+          "no": 0.071429,
+          "not": 0.071429,
+          "help": 0.071429,
+          "assist": 0.071429,
+          "repeat": 0.071429,
+          "again": 0.071429,
+          "want": 0.071429,
+          "need": 0.071429,
+          "break": 0.071429,
+          "tired": 0.071429,
+          "look": 0.071429,
+          "see": 0.071429
         }
       },
       "weight": 1.0
@@ -295,6 +322,10 @@
         "I need a break": {
           "Gesture": 0.5,
           "NoGesture": 0.5
+        },
+        "(no message)": {
+          "Gesture": 0.2,
+          "NoGesture": 0.8
         }
       },
       "weight": 1.0
@@ -353,6 +384,11 @@
           "nod": 0.333333,
           "shake": 0.333333,
           "still": 0.333333
+        },
+        "(no message)": {
+          "nod": 0.166667,
+          "shake": 0.166667,
+          "still": 0.666667
         }
       }
     },
@@ -404,6 +440,57 @@
           "hold": 0.333333,
           "wave": 0.333333,
           "none": 0.333333
+        },
+        "(no message)": {
+          "hold": 0.166667,
+          "wave": 0.166667,
+          "none": 0.666667
+        }
+      }
+    },
+    "point": {
+      "note": "[his call] Neutral until mapped. The user's pointing score (straight, extended, steady arm) from tracker keypoints.",
+      "labels": [
+        "point",
+        "none"
+      ],
+      "weight": 1.0,
+      "table": {
+        "Yes / I agree": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "No / I disagree": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "Please pay attention": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "I want to show you something": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "I need help": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "Can you repeat that?": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "I want something": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "I need a break": {
+          "point": 0.5,
+          "none": 0.5
+        },
+        "(no message)": {
+          "point": 0.2,
+          "none": 0.8
         }
       }
     }
@@ -412,5 +499,6 @@
     "note": "BeliefFilter: half-life of the drift back to the prior, and evidence strength per second.",
     "half_life_s": 2.0,
     "evidence_rate": 1.5
-  }
+  },
+  "note_none": "'(no message)' absorbs silence: without it, intents that come with no signal win whenever the user is idle. Its rows favour each source's absence label."
 }

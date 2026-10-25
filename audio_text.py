@@ -303,6 +303,7 @@ class BayesianFusion:
         self.config = copy.deepcopy(config)
         self.phrases = list(self.config['phrases'])
         self.config.setdefault('sources', {})
+        self._votes = {}
 
     @classmethod
     def from_json(cls, path=CONFIG):
@@ -361,7 +362,38 @@ class BayesianFusion:
                             'informative': any(np.ptp(t) > 1e-9 for t in terms), **detail}
         # weight < 1 tempers a source whose evidence overlaps another's (same frames, same body)
         weight = float(self.config['sources'].get(source, {}).get('weight', 1.0))
+        if terms:
+            self._votes[source] = weight * sum(terms)
         return logp + weight * (sum(terms) if terms else 0.0)
+
+    def votes(self):
+        """Each source's own distribution over intents (its likelihood alone, uniform prior)."""
+        out = {}
+        for source, ll in self._votes.items():
+            if np.ptp(ll) < 1e-9:
+                continue
+            p = np.exp(ll - ll.max())
+            out[source] = dict(zip(self.phrases, (p / p.sum()).tolist()))
+        return out
+
+    def conflicts(self, votes, ratio=2.0):
+        """Pairs of sources that each back a different intent and each reject the other's pick.
+
+        Source s backs intent a when P_s(a) >= ratio / N (well above uniform). s rejects b when P_s(b) <=
+        P_s(a) / ratio. Severity = Jensen-Shannon divergence between the two votes (0..ln 2)."""
+        n = len(self.phrases)
+        backed = {s: max(v, key=v.get) for s, v in votes.items()}
+        backed = {s: a for s, a in backed.items() if votes[s][a] >= ratio / n and a != '(no message)'}
+        out, names = [], sorted(backed)
+        for i, s1 in enumerate(names):
+            for s2 in names[i + 1:]:
+                a, b = backed[s1], backed[s2]
+                if a != b and votes[s1][b] <= votes[s1][a] / ratio and votes[s2][a] <= votes[s2][b] / ratio:
+                    p, q = np.array(list(votes[s1].values())), np.array(list(votes[s2].values()))
+                    m = (p + q) / 2
+                    js = 0.5 * float(np.sum(p * np.log(p / m)) + np.sum(q * np.log(q / m)))
+                    out.append({'sources': (s1, s2), 'intents': (a, b), 'severity': round(js, 3)})
+        return sorted(out, key=lambda c: -c['severity'])
 
     def _dist(self, logp):
         m = logp.max()
@@ -412,6 +444,12 @@ class BayesianFusion:
             arm = {'wave': wave, 'hold': hold, 'none': max(0.0, 1 - wave - hold)}
         logp = self._combine(logp, 'arm', [arm] if arm else [],
                              {'q': arm} if arm else {'status': 'no tracked user'}, evidence)
+        point = None
+        if user is not None:
+            s = float((user.get('pointing') or {}).get('score', 0.0))
+            point = {'point': s, 'none': 1 - s}
+        logp = self._combine(logp, 'point', [point] if point else [],
+                             {'q': point} if point else {'status': 'no tracked user'}, evidence)
         return self._dist(logp), evidence
 
     def make_filter(self):
@@ -427,11 +465,14 @@ class BayesianFusion:
         return self._audio(audio, initial)[0]
 
     def infer(self, visual, audio):
+        self._votes = {}
         # Video gives the initial distribution, audio updates it (Sanjith's diagram). The posterior is the
         # same in either order; only which distribution is shown as 'initial' depends on it.
         initial, ev_video = self._video(visual)
         post, ev_audio = self._audio(audio, initial)
-        return {'initial_distribution': initial, 'posterior': post, 'evidence': {**ev_video, **ev_audio}}
+        votes = self.votes()
+        return {'initial_distribution': initial, 'posterior': post, 'evidence': {**ev_video, **ev_audio},
+                'votes': votes, 'conflicts': self.conflicts(votes)}
 
 
 class BeliefFilter:
