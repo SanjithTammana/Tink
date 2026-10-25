@@ -62,7 +62,11 @@ model's P(Yes)+P(No) is 0.36, vs 0.18 before other replies.
 | + LLM (3 LLM options) | 0.29 | 0.42 | 0.26 |
 | + LLM slot 1, retrieval slots 2-3 | 0.29 | 0.45 | 0.34 |
 
-By type (hit@3, conversation model -> LLM): other 0.23 -> 0.13, I want something 0.07 -> 0.03, Attention
+Select mode (the LLM picks and lightly adapts retrieved real replies, same pairs): hit@1 0.29, hit@3 0.42
+(0.44 as slot 1 + retrieval), mean best cosine 0.39, the highest of any setup. So it is closer on average but
+crosses the 0.7 bar no more often. Latency median 2.64 s.
+
+By type (hit@3, conversation model -> LLM compose): other 0.23 -> 0.13, I want something 0.07 -> 0.03, Attention
 0.20 -> 0.03, Yes/No unchanged at about 1.0. Latency median 2.52 s (p90 2.72 s), 0 failures in 163 calls.
 Read: constrained to the frame, the LLM rephrases what Tink already knows. Retrieved real replies sit closer
 to what people actually said. This is one model and one prompt, and the test has no scene referents (pointing
