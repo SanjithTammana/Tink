@@ -484,7 +484,13 @@ class VideoAnalyzer:
             if len(recent) >= 5:
                 displacement = sum(math.dist(a, b) for a, b in zip(recent, recent[1:]))
                 motion = 'hand moving' if displacement > 0.12 else 'hand relatively still'
-        return {'timestamp_ms': ts_ms, 'gestures': gestures, 'hand_motion': motion}
+        # raw hand landmarks for sign spotting: 21 (x, y) per hand in crop-normalized coordinates, with the
+        # handedness MediaPipe reports (as seen in the image)
+        hands = []
+        for i, hand in enumerate(g.hand_landmarks):
+            side = g.handedness[i][0].category_name if i < len(g.handedness) and g.handedness[i] else 'Unknown'
+            hands.append({'side': side, 'points': [[float(p.x), float(p.y)] for p in hand]})
+        return {'timestamp_ms': ts_ms, 'gestures': gestures, 'hand_motion': motion, 'hand_landmarks': hands}
 
     def close(self):
         self.gesture.close()

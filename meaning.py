@@ -298,6 +298,12 @@ class MeaningComposer:
         clarify = self.clarify.step(conflicts or [], intents, t)
         objects = scene.get('objects') or []
         prior = self.referent_prior(objects, ctx)
+        # a recognised sign that names something (WATER, EAT, BATHROOM) adds that referent, weighted by the
+        # sign's probability; the prior is renormalized after
+        for r, w in (scene.get('referent_hints') or {}).items():
+            prior[r] = prior.get(r, 0.0) + (1 - self.NONE_PRIOR) * w
+        z = sum(prior.values())
+        prior = {r: v / z for r, v in prior.items()}
         pointing = scene.get('pointing') or {}
         refs = self.referents.step(prior, self.pointing_loglik(pointing, objects, prior), t)
         pointed = pointing.get('score', 0.0) >= 0.3

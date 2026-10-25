@@ -13,7 +13,7 @@ Corpora (downloaded by `python conversation.py fetch`, kept out of git):
 - DailyDialog (Li et al. 2017), 13,118 everyday dialogues, CC BY-NC-SA 4.0, via ConvLab on Hugging Face.
 - Vertanen (2017) crowdsourced AAC-style dialogues, 1,419 x 6 turns; no license stated, so local use only.
 
-Run: python conversation.py fetch | build | query "Do you want some water?" | eval
+Run: python conversation.py fetch | build | soften | fit | query "Do you want some water?" | eval
 """
 import argparse
 import io
@@ -111,16 +111,88 @@ def build():
     print('saved', INDEX, '| reply labels:', {l: labels.count(l) for l in sorted(set(labels))})
 
 
+SOFT = ROOT / 'models' / 'conversation_soft.npz'
+PARAMS = ROOT / 'models' / 'conversation_params.json'
+RULE_WEIGHT = 0.5    # soft reply label = RULE_WEIGHT * rule one-hot + (1 - RULE_WEIGHT) * act-model distribution
+
+
+def soften(intents):
+    """Soft class distribution for every corpus reply: half the rule label (it knows Tink-only intents such as
+    'I need a break'), half the SwDA act model's P(class | reply). Saved beside the index."""
+    from acts import ActModel
+    am = ActModel()
+    z = np.load(INDEX, allow_pickle=False)
+    classes = list(intents) + [OTHER]
+    replies = [str(r) for r in z['reply']]
+    print(f'soft-labelling {len(replies)} replies with the act model (one-off, a few minutes on CPU)')
+    act_soft = am.reply_class(replies)                     # (n, am.classes)
+    soft = np.zeros((len(replies), len(classes)), np.float32)
+    for j, c in enumerate(am.classes):
+        soft[:, classes.index(c)] += (1 - RULE_WEIGHT) * act_soft[:, j]
+    for i, label in enumerate(z['label']):
+        soft[i, classes.index(str(label))] += RULE_WEIGHT
+    np.savez_compressed(SOFT, soft=soft.astype(np.float16), classes=np.array(classes))
+    print('saved', SOFT, '| mean soft mass:', {c: round(float(v), 3) for c, v in zip(classes, soft.mean(0))})
+
+
 class ConversationModel:
+    POOL = 300
+    """P(class | partner text) = w * P_knn + (1 - w) * P_act, where
+    P_knn = (alpha / K + sum_i w_i soft_i) / (alpha + sum_i w_i), w_i = exp((cos_i - cos_max) / tau) over the k
+    nearest partner turns (soft_i: the neighbour reply's soft label, or its rule one-hot without soft labels);
+    P_act = the SwDA act-transition estimate (acts.ActModel.context_class). tau and w are fitted on held-out
+    data by cross-entropy (`python conversation.py fit`) and read from models/conversation_params.json."""
+
     def __init__(self, intents, path=INDEX, splits=('train', 'validation'), k=40, tau=0.05, alpha=1.0,
-                 min_cos=0.45, model=None):
+                 min_cos=0.45, model=None, w_knn=1.0, use_soft=True, beta=0.0):
+        import json
         z = np.load(path, allow_pickle=False)
         keep = np.isin(z['split'], list(splits))
         self.ctx, self.reply, self.label = z['ctx'][keep], z['reply'][keep], z['label'][keep]
         self.vecs = z['vecs'][keep].astype(np.float32)
         self.intents = [i for i in intents]
-        self.k, self.tau, self.alpha, self.min_cos = k, tau, alpha, min_cos
+        self.classes = self.intents + [OTHER]
+        if PARAMS.exists():
+            params = json.loads(PARAMS.read_text(encoding='utf-8'))
+            tau, w_knn, beta = params.get('tau', tau), params.get('w_knn', w_knn), params.get('beta', beta)
+        self.k, self.tau, self.alpha, self.min_cos, self.w_knn, self.beta = k, tau, alpha, min_cos, w_knn, beta
+        self.soft = None
+        if use_soft and SOFT.exists():
+            s = np.load(SOFT, allow_pickle=False)
+            if list(s['classes']) == self.classes:
+                self.soft = s['soft'][keep].astype(np.float32)
+        if self.soft is None:
+            self.soft = np.eye(len(self.classes), dtype=np.float32)[[self.classes.index(str(l)) for l in self.label]]
+        from acts import MODEL, ActModel
+        self.acts = ActModel() if MODEL.exists() else None
+        # dialogue-act distribution of every partner turn, straight from the stored embeddings (no re-encoding)
+        self.ctx_acts = self.acts.act_probs(vecs=self.vecs).astype(np.float32) if self.acts else None
         self.model = model or embedder()
+        if self.acts:
+            self.acts.encoder = self.model
+
+    def act_prior(self, vec):
+        p = self.acts.context_class(vecs=vec[None])[0]
+        out = np.zeros(len(self.classes))
+        for j, c in enumerate(self.acts.classes):
+            out[self.classes.index(c)] += p[j]
+        return out
+
+    def kernel(self, q, sims, qa=None, tau=None, beta=None, k=None):
+        """Indices and weights of the k neighbours: w_i = exp((cos_i - cos_max) / tau) * BC(q, i) ** beta, over a
+        pool of the POOL most similar partner turns. BC is the Bhattacharyya coefficient between the two turns'
+        dialogue-act distributions (1 = same kind of turn), so a yes/no question mostly draws on replies to
+        other yes/no questions rather than on topically similar requests."""
+        tau, beta, k = tau or self.tau, self.beta if beta is None else beta, k or self.k
+        pool = np.argpartition(-sims, self.POOL)[:self.POOL]
+        logw = (sims[pool] - sims[pool].max()) / tau
+        if beta and self.ctx_acts is not None:
+            qa = self.acts.act_probs(vecs=q[None])[0] if qa is None else qa
+            bc = np.sqrt(self.ctx_acts[pool] * qa).sum(axis=1)
+            logw = logw + beta * np.log(np.clip(bc, 1e-6, 1))
+        order = np.argsort(-logw)[:k]
+        top, logw = pool[order], logw[order]
+        return top, np.exp(logw - logw.max())
 
     def query(self, text, k=None):
         """{'prior': {intent or 'other': p}, 'replies': [(reply, label, weight, partner turn)], 'match': cos}
@@ -129,25 +201,63 @@ class ConversationModel:
             return None
         q = self.model.encode([text], normalize_embeddings=True, convert_to_numpy=True)[0]
         sims = self.vecs @ q
-        k = k or self.k
-        top = np.argpartition(-sims, k)[:k]
-        top = top[np.argsort(-sims[top])]
-        if sims[top[0]] < self.min_cos:
+        if sims.max() < self.min_cos:
             return None
-        w = np.exp((sims[top] - sims[top[0]]) / self.tau)
-        classes = self.intents + [OTHER]
-        mass = {c: self.alpha / len(classes) for c in classes}
-        for i, wi in zip(top, w):
-            mass[str(self.label[i])] = mass.get(str(self.label[i]), 0.0) + float(wi)
-        z = sum(mass.values())
-        prior = dict(sorted(((c, m / z) for c, m in mass.items()), key=lambda x: -x[1]))
+        top, w = self.kernel(q, sims, k=k)
+        p = (self.alpha / len(self.classes) + w @ self.soft[top]) / (self.alpha + w.sum())
+        if self.acts and self.w_knn < 1.0:
+            p = self.w_knn * p + (1 - self.w_knn) * self.act_prior(q)
+        prior = dict(sorted(zip(self.classes, p.tolist()), key=lambda x: -x[1]))
         replies, seen = [], set()
         for i, wi in zip(top, w):
             r = str(self.reply[i])
             if r.lower() not in seen and len(r.split()) <= 20:
                 seen.add(r.lower())
                 replies.append((r, str(self.label[i]), float(wi / w.sum()), str(self.ctx[i])))
-        return {'prior': prior, 'replies': replies, 'match': float(sims[top[0]])}
+        return {'prior': prior, 'replies': replies, 'match': float(sims.max())}
+
+
+def fit(intents, n=800, seed=0):
+    """Choose tau and w_knn by cross-entropy on validation pairs (neighbours from train only). The target is
+    the true reply's soft label, so a sharper or flatter curve is rewarded only if it predicts better."""
+    import json
+    from acts import ActModel
+    if PARAMS.exists():
+        PARAMS.unlink()      # fit from the defaults, not from a previous fit
+    cm = ConversationModel(intents, splits=('train',), w_knn=0.5)
+    z = np.load(INDEX, allow_pickle=False)
+    s = np.load(SOFT, allow_pickle=False)['soft'].astype(np.float32) if SOFT.exists() else None
+    val = np.flatnonzero(z['split'] == 'validation')
+    val = np.random.default_rng(seed).choice(val, size=min(n, len(val)), replace=False)
+    Q = cm.model.encode([str(z['ctx'][i]) for i in val], batch_size=256, normalize_embeddings=True,
+                        convert_to_numpy=True)
+    target = s[val] if s is not None else np.eye(len(cm.classes))[[cm.classes.index(str(z['label'][i])) for i in val]]
+    act = np.array([cm.act_prior(q) for q in Q]) if cm.acts else None
+    QA = cm.acts.act_probs(vecs=Q) if cm.acts else [None] * len(Q)
+    results = []
+    for tau in (0.2, 0.5, 1.0, 2.0):
+        for beta in ((0.0, 1.0, 2.0, 4.0) if cm.acts else (0.0,)):
+            knn = []
+            for q, qa in zip(Q, QA):
+                top, w = cm.kernel(q, cm.vecs @ q, qa=qa, tau=tau, beta=beta)
+                knn.append((cm.alpha / len(cm.classes) + w @ cm.soft[top]) / (cm.alpha + w.sum()))
+            knn = np.array(knn)
+            for w_knn in ((0.5, 0.75, 1.0) if act is not None else (1.0,)):
+                p = w_knn * knn + (1 - w_knn) * (act if act is not None else 0)
+                ce = -np.mean(np.sum(target * np.log(np.clip(p, 1e-9, 1)), axis=1))
+                results.append((ce, tau, beta, w_knn))
+    results.sort()
+    base = -np.mean(np.sum(target * np.log(np.clip(target.mean(0), 1e-9, 1)), axis=1))
+    print(f'{len(val)} validation pairs | base-rate cross-entropy {base:.3f}')
+    for ce, tau, beta, w_knn in results[:8]:
+        print(f'  tau={tau:<4} beta={beta:<4} w_knn={w_knn:<5} cross-entropy {ce:.3f}')
+    for ce, tau, beta, w_knn in results:
+        if beta == 0.0 and w_knn == 1.0 and tau == results[0][1]:
+            print(f'  (same tau, meaning-only kernel, no act mixture: {ce:.3f})')
+    ce, tau, beta, w_knn = results[0]
+    PARAMS.write_text(json.dumps({'tau': tau, 'beta': beta, 'w_knn': w_knn, 'validation_cross_entropy': round(ce, 4),
+                                  'base_rate_cross_entropy': round(float(base), 4)}, indent=2), encoding='utf-8')
+    print('saved', PARAMS)
 
 
 def evaluate(n=600, seed=0):
@@ -205,7 +315,7 @@ def evaluate(n=600, seed=0):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    p.add_argument('cmd', choices=['fetch', 'build', 'query', 'eval'])
+    p.add_argument('cmd', choices=['fetch', 'build', 'soften', 'fit', 'query', 'eval'])
     p.add_argument('text', nargs='?')
     a = p.parse_args()
     if a.cmd == 'fetch':
@@ -214,6 +324,10 @@ def main():
         build()
     elif a.cmd == 'eval':
         evaluate()
+    elif a.cmd in ('soften', 'fit'):
+        from retrieval import intents_from_config
+        intents = [i for i in intents_from_config() if i != '(no message)']
+        soften(intents) if a.cmd == 'soften' else fit(intents)
     else:
         from retrieval import intents_from_config
         cm = ConversationModel([i for i in intents_from_config() if i != '(no message)'])

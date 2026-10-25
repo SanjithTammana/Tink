@@ -1,0 +1,21 @@
+{
+  "note": "Enrolled keyword signs and what each means to Tink. 'intent' is the intent the sign is evidence for (P(sign | intent) is high for it); 'referent' (optional) is what the sign names, so WATER points the meaning layer at water. Editable; not ASL interpretation, only the user's own enrolled signs.",
+  "strength": 0.7,
+  "signs": {
+    "YES": {"intent": "Yes / I agree"},
+    "NO": {"intent": "No / I disagree"},
+    "HELP": {"intent": "I need help"},
+    "MORE": {"intent": "I want something"},
+    "STOP": {"intent": "No / I disagree"},
+    "EAT": {"intent": "I want something", "referent": "food"},
+    "DRINK": {"intent": "I want something", "referent": "water"},
+    "WATER": {"intent": "I want something", "referent": "water"},
+    "BATHROOM": {"intent": "I need help", "referent": "toilet"},
+    "FINISH": {"intent": "I need a break"},
+    "PAIN": {"intent": "I need help"},
+    "WANT": {"intent": "I want something"},
+    "PLEASE": {"intent": "I want something"},
+    "THANK-YOU": {"intent": "Yes / I agree"},
+    "AGAIN": {"intent": "Can you repeat that?"}
+  }
+}

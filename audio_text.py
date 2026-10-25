@@ -450,7 +450,27 @@ class BayesianFusion:
             point = {'point': s, 'none': 1 - s}
         logp = self._combine(logp, 'point', [point] if point else [],
                              {'q': point} if point else {'status': 'no tracked user'}, evidence)
+        sign = visual.get('sign') or {}
+        ok = sign.get('status') == 'ok' and sign.get('probs') and 'sign' in self.config['sources']
+        logp = self._combine(logp, 'sign', [sign['probs']] if ok else [],
+                             {'probs': sign['probs']} if ok else {'status': sign.get('status', 'missing')}, evidence)
         return self._dist(logp), evidence
+
+    def add_sign_source(self, meanings, enrolled, no_sign='(no sign)'):
+        """Likelihood table for enrolled keyword signs: P(sign | intent). Each sign weighs `peak` for its mapped
+        intent against 1 for every other intent; 'no sign' weighs 3 for every intent and 8 for '(no message)'.
+        Rows are normalized. peak comes from meanings['strength'] (0..1 -> 4..20), so a weaker setting makes a
+        recognised sign count for less."""
+        peak = 4 + 16 * float(meanings.get('strength', 0.7))
+        labels = list(enrolled) + [no_sign]
+        table = {}
+        for intent in self.phrases:
+            row = {s: (peak if meanings['signs'].get(s, {}).get('intent') == intent else 1.0) for s in enrolled}
+            row[no_sign] = 8.0 if intent == '(no message)' else 3.0
+            z = sum(row.values())
+            table[intent] = {k: v / z for k, v in row.items()}
+        self.config['sources']['sign'] = {'labels': labels, 'table': table, 'weight': 1.0,
+                                          'note': 'built from config/signs.json and the enrolled signs'}
 
     def make_filter(self):
         f = self.config.get('filter', {})

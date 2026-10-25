@@ -18,6 +18,7 @@ import numpy as np
 from audio_text import AudioPipeline, BayesianFusion
 from meaning import NONE, MeaningComposer
 from retrieval import PhraseDatabase, PhraseRanker
+from signs import NO_SIGN, SignLibrary, SignSpotter, load_meanings
 from tts import Speaker
 from video import ThreadedVideoAnalyzer, TrackerProcess, VideoAnalyzer
 
@@ -99,6 +100,12 @@ def draw_panel(frame, visual, audio, result, top, notice, display_fps=0.0):
     user = next((p for p in visual.get('people', []) if p['id'] == target_id), None)
     if user and user.get('signals'):
         line(f"Arm: hold {user['signals']['hold']:.2f}  wave {user['signals']['wave']:.2f}")
+    sg = visual.get('sign') or {}
+    if sg.get('probs'):
+        lead = sorted(sg['probs'].items(), key=lambda z: -z[1])[:2]
+        line('Sign: ' + ', '.join(f'{k} {v*100:.0f}%' for k, v in lead))
+    else:
+        line(f"Sign: {sg.get('status', 'off')}")
     face = sorted(visual['face_movements'].items(), key=lambda z: -z[1])[:2]
     line('Face (not emotion): ' + ', '.join(f'{k} {v*100:.0f}%' for k, v in face))
     header('AUDIO EVIDENCE')
@@ -151,6 +158,8 @@ def main():
     parser.add_argument('--yolo', '--no-yolo', action='store_true', help=argparse.SUPPRESS)  # old flags, no-ops
     parser.add_argument('--no-envision', action='store_true')
     parser.add_argument('--no-objects', action='store_true', help='no object detection (pointing targets)')
+    parser.add_argument('--no-signs', action='store_true', help='ignore enrolled keyword signs')
+    parser.add_argument('--user', default='default', help='whose enrolled signs to load (data/signs/<user>)')
     parser.add_argument('--no-conversation', action='store_true',
                         help='no dialogue-corpus context model (use the built-in question rules)')
     parser.add_argument('--mapping', choices=['config', 'provisional'], default='config',
@@ -173,6 +182,15 @@ def main():
         prov = json.loads((ROOT / 'config' / 'mapping_provisional.json').read_text(encoding='utf-8'))
         for src, spec in prov['sources'].items():
             fusion.config['sources'][src].update({'labels': spec['labels'], 'table': spec['table']})
+    meanings, spotter = load_meanings(), None
+    if not args.no_signs:
+        library = SignLibrary(args.user)
+        if library.signs:
+            fusion.add_sign_source(meanings, library.signs)
+            spotter = SignSpotter(library)
+            print(f'Enrolled signs: {", ".join(library.signs)}')
+        else:
+            print('No enrolled signs: run `python signs.py enroll` to teach Tink your signs.')
     belief_filter = fusion.make_filter()
     belief_user = None
     ranker = PhraseRanker(PhraseDatabase(), fusion.phrases)
@@ -204,6 +222,7 @@ def main():
     latest = None
     notice = None
     history, last_heard = [], None     # the conversation so far: ('partner' | 'you', text)
+    last_hands_ts, sign = None, {'status': 'not enrolled' if spotter is None else 'starting', 'probs': None}
     shown = deque(maxlen=30)
     print('Keys: 1-3 confirm + speak, 0 reject, N switch user, Q quit.')
     try:
@@ -225,17 +244,26 @@ def main():
             else:
                 # Every frame: Envision's velocity features assume consecutive frames at 25-30 fps.
                 latest = visual.analyze(frame, ts)
+            if spotter and latest.get('hand_landmarks') is not None and latest['timestamp_ms'] != last_hands_ts:
+                last_hands_ts = latest['timestamp_ms']
+                sign = spotter.update(ts / 1000, latest['hand_landmarks'])
+            latest['sign'] = sign
             ap = audio.get()
             result = fusion.infer(latest, ap)
             if latest.get('target_id') != belief_user:   # a different person: start their belief fresh
                 belief_filter.reset()
                 composer.referents.reset()
+                if spotter:
+                    spotter.reset()
                 belief_user = latest.get('target_id')
             result['belief'] = belief_filter.step(result['posterior'], ts / 1000)
             user = next((p for p in latest.get('people', []) if p['id'] == latest.get('target_id')), {})
             fresh = ap.get('timestamp') is not None and time.time() - ap['timestamp'] < 10
             result['meaning'] = composer.compose(
-                result['belief'], {'objects': latest.get('objects', []), 'pointing': user.get('pointing')},
+                result['belief'], {'objects': latest.get('objects', []), 'pointing': user.get('pointing'),
+                                   'referent_hints': {meanings['signs'][s]['referent']: p
+                                                      for s, p in (sign.get('probs') or {}).items()
+                                                      if s != NO_SIGN and meanings['signs'].get(s, {}).get('referent')}},
                 ap.get('transcript', '') if fresh else '', ts / 1000, k=args.top, conflicts=result['conflicts'])
             if fresh and ap.get('transcript') and ap['timestamp'] != last_heard:   # a new partner turn
                 history.append(('partner', ap['transcript']))

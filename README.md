@@ -29,6 +29,21 @@ python conversation.py fetch
 python conversation.py build
 ```
 
+Teach Tink your signs (each sign recorded 4 times; personal recordings stay in `data/signs/`, not in git):
+```bash
+python signs.py enroll --signs YES NO HELP MORE WATER BATHROOM
+python signs.py check
+```
+These are the user's own enrolled keyword signs, not ASL interpretation (see `docs/RESEARCH-asl.md`).
+
+Dialogue-act model (Switchboard, CC BY-NC-SA 3.0, downloaded not committed):
+```bash
+python acts.py fetch
+python acts.py train
+python conversation.py soften
+python conversation.py fit
+```
+
 Keys: **1–3** confirm an interpretation and speak it, **0** rejects all, **N** switches which person is the user, **Q** quits. `--video file.mp4`
 replaces the camera; `--headless --max-frames N` runs without a window.
 
@@ -42,6 +57,8 @@ replaces the camera; `--headless --max-frames N` runs without a window.
 | `tts.py` | offline text-to-speech |
 | `meaning.py` | meaning layer: partner-question context, referents from pointing, mixed-signal clarify, sentence composer |
 | `conversation.py` | conversation model: embedded (partner turn -> reply) pairs give P(reply type \| partner) and real replies |
+| `signs.py` | enrolled keyword signs: guided recording, DTW spotting with a no-sign option, calibrated probabilities |
+| `acts.py` | Switchboard dialogue acts as probabilities: P(act \| text), act transitions, act -> intent map |
 | `simulate.py` | simulator and evaluations (synthetic signals, real held-out dialogues, AAC corpus coverage) |
 | `run.py` | live loop and panel |
 | `config/` | likelihood tables (placeholders) and the phrase database |

@@ -12,3 +12,4 @@ multimodal_packet.tmp
 *.joblib
 panel_snapshot.png
 data/dialogue/
+data/signs/
