@@ -3,7 +3,7 @@ import random
 import sys
 from collections import defaultdict
 
-sys.path.insert(0, r'C:\Users\sanji\PycharmProjects\tink')
+sys.path.insert(0, str(__import__('pathlib').Path(__file__).resolve().parents[1]))   # repo root
 import numpy as np
 import simulate as S
 from conversation import INDEX, ConversationModel
